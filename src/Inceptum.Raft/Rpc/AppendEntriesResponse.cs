@@ -1,3 +1,5 @@
+using System;
+
 namespace Inceptum.Raft.Rpc
 {
     /// <summary>
@@ -20,5 +22,13 @@ namespace Inceptum.Raft.Rpc
         ///   <c>true</c> if ollower contained entry matching prevLogIndex and prevLogTerm; otherwise, <c>false</c>.
         /// </value>
         public bool Success { get; set; }
+
+        /// <summary>
+        /// Gets or sets the node identifier.
+        /// </summary>
+        /// <value>
+        /// The node identifier.
+        /// </value>
+        public Guid NodeId { get; set; }
     }
 }

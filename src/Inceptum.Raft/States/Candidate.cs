@@ -14,31 +14,39 @@ namespace Inceptum.Raft.States
         }
 
         public override void Enter()
-        { 
+        {
+            //If election timeout elapses: start new election
+            startElection();
+        }
+
+        private void startElection()
+        {
             m_Votes = new Dictionary<Guid, RequestVoteResponse>
             {
                 {
-                    Node.Id, 
+                    Node.Id,
                     new RequestVoteResponse
-                        {
-                            Term = Node.IncrementTerm(), 
-                            VoteGranted = true
-                        }
+                    {
+                        Term = Node.IncrementTerm(),
+                        VoteGranted = true
+                    }
                 }
             };
 
-            Node.RequestVotes();
             Node.ResetTimeout();
+            Node.RequestVotes();
         }
 
         public override void Timeout()
         {
-            throw new System.NotImplementedException();
+            //On conversion to candidate, start election
+            startElection();
         }
 
-        public override RequestVoteResponse RequestVote(RequestVoteRequest request)
+        public override bool RequestVote(RequestVoteRequest request)
         {
-            throw new NotImplementedException();
+            //term in request is not newer than our (otherwise state should have been already changed to follower)
+            return false;
         }
 
         public override void ProcessVote(Guid node, RequestVoteResponse vote)
@@ -48,15 +56,11 @@ namespace Inceptum.Raft.States
                 Node.SwitchToLeader();
         }
 
-        public override AppendEntriesResponse AppendEntries(AppendEntriesRequest request)
+        public override bool AppendEntries(AppendEntriesRequest request)
         {
-
-            throw new NotImplementedException();
+            //term in request is not newer than our (otherwise state should have been already changed to follower)
+            return false;
         }
-
-        public override void ProcessAppendEntries(Guid node, AppendEntriesResponse appendEntriesResponse)
-        {
-            throw new NotImplementedException();
-        }
+ 
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
@@ -35,10 +36,11 @@ namespace Inceptum.Raft.States
 
         public override void Timeout()
         {
-            //Sennd heartbeat
+            //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
+            Node.SendHeartBeats();
         }
-
-        public override RequestVoteResponse RequestVote(RequestVoteRequest request)
+        //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
+        public override bool RequestVote(RequestVoteRequest request)
         {
             throw new NotImplementedException();
         }
@@ -48,12 +50,12 @@ namespace Inceptum.Raft.States
             throw new NotImplementedException();
         }
 
-        public override AppendEntriesResponse AppendEntries(AppendEntriesRequest request)
+        public override bool AppendEntries(AppendEntriesRequest request)
         {
             throw new NotImplementedException();
         }
 
-        public override void ProcessAppendEntries(Guid node, AppendEntriesResponse appendEntriesResponse)
+        public override void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse appendEntriesResponse)
         {
             throw new NotImplementedException();
         }

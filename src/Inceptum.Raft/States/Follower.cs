@@ -14,7 +14,7 @@ namespace Inceptum.Raft.States
 
         public override void Enter()
         {
-            throw new NotImplementedException();
+            Node.ResetTimeout();
         }
 
         public override void Timeout()
@@ -22,26 +22,42 @@ namespace Inceptum.Raft.States
             Node.SwitchToCandidate();
         }
 
-        public override RequestVoteResponse RequestVote(RequestVoteRequest request)
+        public override bool RequestVote(RequestVoteRequest request)
         {
-            throw new NotImplementedException();
             Node.ResetTimeout();
+            //Reply false if term < currentTerm
+            if (request.Term < Node.PersistentState.CurrentTerm)
+                return false;
+            //If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
+            return 
+                Node.PersistentState.VotedFor == default(Guid) || 
+                Node.PersistentState.VotedFor == request.CandidateId &&
+                Node.PersistentState.IsLogOlderOrEqual(request.LastLogIndex, request.LastLogTerm);
         }
 
-        public override void ProcessVote(Guid node, RequestVoteResponse vote)
+        public override bool AppendEntries(AppendEntriesRequest request)
         {
-            throw new NotImplementedException();
-        }
-
-        public override AppendEntriesResponse AppendEntries(AppendEntriesRequest request)
-        {
-            throw new NotImplementedException();
             Node.ResetTimeout();
-        }
 
-        public override void ProcessAppendEntries(Guid node, AppendEntriesResponse appendEntriesResponse)
-        {
-            throw new NotImplementedException();
+            //Reply false if term < currentTerm (§5.1)
+            if (request.Term < Node.PersistentState.CurrentTerm)
+                return false;
+
+            //Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+            if(!Node.PersistentState.EntryTermMatches(request.PrevLogIndex,request.PrevLogTerm))
+                return false;
+
+            //If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
+            Node.PersistentState.DeleteEntriesAfter(request.PrevLogIndex);
+            
+            //Append any new entries not already in the log
+            Node.PersistentState.Append(request.Entries);
+
+            // If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+            Node.Commit(request.LeaderCommit);
+
+            return true;
         }
+ 
     }
 }

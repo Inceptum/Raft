@@ -7,9 +7,9 @@ namespace Inceptum.Raft
     {
         void Enter();
         void Timeout();
-        RequestVoteResponse RequestVote(RequestVoteRequest request);
+        bool RequestVote(RequestVoteRequest request);
         void ProcessVote(Guid node,RequestVoteResponse vote);
-        AppendEntriesResponse AppendEntries(AppendEntriesRequest request);
-        void ProcessAppendEntries(Guid node, AppendEntriesResponse appendEntriesResponse);
+        bool AppendEntries(AppendEntriesRequest request);
+        void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse appendEntriesResponse);
     }
 }

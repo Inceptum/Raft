@@ -14,9 +14,18 @@ namespace Inceptum.Raft.States
 
         public abstract void Enter();
         public abstract void Timeout();
-        public abstract RequestVoteResponse RequestVote(RequestVoteRequest request);
-        public abstract void ProcessVote(Guid node, RequestVoteResponse vote);
-        public abstract AppendEntriesResponse AppendEntries(AppendEntriesRequest request);
-        public abstract void ProcessAppendEntries(Guid node, AppendEntriesResponse appendEntriesResponse);
+        public abstract bool RequestVote(RequestVoteRequest request);
+
+        public virtual void ProcessVote(Guid node, RequestVoteResponse vote)
+        {
+            Node.Log("Ignoring RequestVoteResponse since node is not a candidate");
+            
+        }
+        public abstract bool AppendEntries(AppendEntriesRequest request);
+
+        public virtual void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse appendEntriesResponse)
+        {
+            Node.Log("Ignoring AppendEntriesResponse since node is not a leader");
+        }
     }
 }

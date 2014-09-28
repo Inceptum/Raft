@@ -38,7 +38,7 @@ namespace Inceptum.Raft
         /// <value>
         /// The index of the commit.
         /// </value>
-        public long CommitIndex { get;  private set; }
+        public int CommitIndex { get;  private  set; }
         /// <summary>
         /// Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
         /// </summary>
@@ -93,11 +93,7 @@ namespace Inceptum.Raft
             m_Timeout = Configuration.ElectionTimeout;
             m_Reset.Set();
         }
-
-        public void Timeout()
-        {
-            m_State.Timeout();
-        }
+     
 
         public void SwitchToCandidate()
         {
@@ -113,7 +109,7 @@ namespace Inceptum.Raft
 
         public void SwitchToLeader()
         {
-              m_State=new Leader(this);
+            m_State = new Leader(this);
         }
 
         public void SwitchToFollower()
@@ -126,12 +122,19 @@ namespace Inceptum.Raft
 
         private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest request)
         {
+
             if (request.Term > PersistentState.CurrentTerm)
             {
                 PersistentState.CurrentTerm = request.Term;
                 SwitchToFollower();
             }
-            return m_State.AppendEntries(request);
+
+            return new AppendEntriesResponse
+            {
+                Success = m_State.AppendEntries(request),
+                Term = PersistentState.CurrentTerm,
+                NodeId = this.Id
+            };
         }
 
         private RequestVoteResponse voteHandler(Guid nodeId, RequestVoteRequest request)
@@ -141,12 +144,17 @@ namespace Inceptum.Raft
                 PersistentState.CurrentTerm = request.Term;
                 SwitchToFollower();
             }
-            return m_State.RequestVote(request);
+
+            return new RequestVoteResponse
+            {
+                Term = PersistentState.CurrentTerm,
+                VoteGranted = m_State.RequestVote(request)
+            };
         }
 
         public void AppendEntries(Guid node, AppendEntriesRequest request)
         {
-            m_Transport.Send(node, request, response => m_State.ProcessAppendEntries(node, response));
+            m_Transport.Send(node, request, response => m_State.ProcessAppendEntriesResponse(node, response));
         }
 
 
@@ -175,6 +183,42 @@ namespace Inceptum.Raft
             m_VoteSubscription.Dispose();
             m_Stop.Set();
             m_WrokerThread.Join();
+        }
+
+        public void Commit(long leaderCommit)
+        {
+            for (int i = CommitIndex+1; i <=Math.Min(leaderCommit,PersistentState.Log.Count-1); i++)
+            {
+                //TODO: actual commit logic
+                Console.WriteLine(PersistentState.Log[i].Command);
+                CommitIndex = i;
+                LastApplied = i;
+            }
+        }
+
+        public void Log(string format,params object[] args)
+        {
+            Console.WriteLine(Id+": "+string.Format(format,args));
+        }
+
+        public void SendHeartBeats()
+        {
+            var request = new AppendEntriesRequest
+            {
+                Term = PersistentState.CurrentTerm,
+                Entries = null,
+                LeaderCommit = CommitIndex,
+                LeaderId = Id,
+                PrevLogIndex = PersistentState.Log.Count - 1,
+                PrevLogTerm = PersistentState.Log.Select(e => e.Term).LastOrDefault()
+            };
+
+            foreach (var node in Configuration.KnownNodes)
+            {
+                var nodeId = node;
+                m_Transport.Send(node, request, response => m_State.ProcessAppendEntriesResponse(nodeId, response));
+            }
+            ResetTimeout();
         }
     }
 }

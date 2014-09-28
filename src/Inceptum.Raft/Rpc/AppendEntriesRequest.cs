@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Inceptum.Raft.Rpc
 {
@@ -29,7 +30,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The index of the previous log.
         /// </value>
-        public long PrevLogIndex { get; set; }
+        public int PrevLogIndex { get; set; }
 
         /// <summary>
         /// Gets or sets the term of PrevLogIndex entry.
@@ -45,7 +46,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The entries.
         /// </value>
-        ILogEntry<object> Entries { get; set; }
+        public IEnumerable<ILogEntry<object>> Entries { get; set; }
 
         /// <summary>
         /// Gets or sets the leader’s commit index.
