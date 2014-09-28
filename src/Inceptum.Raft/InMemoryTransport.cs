@@ -47,7 +47,8 @@ namespace Inceptum.Raft
                 Func<Guid, RequestVoteRequest, RequestVoteResponse> handler;
                 if (m_RequestVoteSubscriptions.TryGetValue(id, out handler))
                 {
-                    handler(id, request);
+                    var response = handler(id, request);
+                    callback(response);
                 }
             });
         }

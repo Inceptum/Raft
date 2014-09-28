@@ -14,30 +14,31 @@ namespace Inceptum.Raft.States
 
         public override void Enter()
         {
+            Node.Log("I am follower");
+
             Node.ResetTimeout();
         }
 
         public override void Timeout()
         {
+            Node.Log("No Append entries within timeout. ");
             Node.SwitchToCandidate();
         }
 
         public override bool RequestVote(RequestVoteRequest request)
         {
-            Node.ResetTimeout();
             //Reply false if term < currentTerm
-            if (request.Term < Node.PersistentState.CurrentTerm)
+            if (request.Term < Node.PersistentState.CurrentTerm )
                 return false;
             //If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
             return 
-                Node.PersistentState.VotedFor == default(Guid) || 
-                Node.PersistentState.VotedFor == request.CandidateId &&
+                (Node.PersistentState.VotedFor == default(Guid) || 
+                Node.PersistentState.VotedFor == request.CandidateId) &&
                 Node.PersistentState.IsLogOlderOrEqual(request.LastLogIndex, request.LastLogTerm);
         }
 
         public override bool AppendEntries(AppendEntriesRequest request)
         {
-            Node.ResetTimeout();
 
             //Reply false if term < currentTerm (§5.1)
             if (request.Term < Node.PersistentState.CurrentTerm)

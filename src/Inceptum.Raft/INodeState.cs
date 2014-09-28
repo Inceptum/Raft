@@ -10,6 +10,6 @@ namespace Inceptum.Raft
         bool RequestVote(RequestVoteRequest request);
         void ProcessVote(Guid node,RequestVoteResponse vote);
         bool AppendEntries(AppendEntriesRequest request);
-        void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse appendEntriesResponse);
+        void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response);
     }
 }

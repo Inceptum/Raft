@@ -23,7 +23,7 @@ namespace Inceptum.Raft.States
         }
         public abstract bool AppendEntries(AppendEntriesRequest request);
 
-        public virtual void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse appendEntriesResponse)
+        public virtual void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response)
         {
             Node.Log("Ignoring AppendEntriesResponse since node is not a leader");
         }

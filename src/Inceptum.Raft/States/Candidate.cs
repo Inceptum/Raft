@@ -15,12 +15,15 @@ namespace Inceptum.Raft.States
 
         public override void Enter()
         {
-            //If election timeout elapses: start new election
+            //On conversion to candidate, start election
             startElection();
+            Node.Log("I am candidate");
         }
 
         private void startElection()
         {
+            Node.ResetTimeout();
+            Node.Log("Starting Election");
             m_Votes = new Dictionary<Guid, RequestVoteResponse>
             {
                 {
@@ -32,14 +35,16 @@ namespace Inceptum.Raft.States
                     }
                 }
             };
+            //TODO: Grappy code, two places where votedFor is set...
+            Node.PersistentState.VotedFor = Node.Id;
 
-            Node.ResetTimeout();
             Node.RequestVotes();
+            Node.ResetTimeout();
         }
 
         public override void Timeout()
         {
-            //On conversion to candidate, start election
+            //If election timeout elapses: start new election
             startElection();
         }
 
@@ -51,7 +56,9 @@ namespace Inceptum.Raft.States
 
         public override void ProcessVote(Guid node, RequestVoteResponse vote)
         {
-            m_Votes.Add(node,vote);
+            if(m_Votes.ContainsKey(node))
+                Console.WriteLine("!!!");
+            m_Votes[node]=vote;
             if(m_Votes.Values.Count(v=>v.VoteGranted)>=Node.Configuration.Majority)
                 Node.SwitchToLeader();
         }

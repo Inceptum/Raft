@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,9 +16,16 @@ namespace Inceptum.Raft
         public List<Guid> KnownNodes { get; set; } 
         public Guid NodeId { get; set; }
 
+
+        public NodeConfiguration(Guid nodeId, params Guid[] knownNodes)
+        {
+            NodeId = nodeId;
+            KnownNodes = knownNodes.Where(n=>n!=nodeId).ToList();
+        }
+
         public int Majority
         {
-            get { return KnownNodes==null?0:KnownNodes.Count/2; }
+            get { return KnownNodes == null ? 0 : KnownNodes.Count / 2 + 1; }
         }
     }
 
@@ -63,23 +71,30 @@ namespace Inceptum.Raft
             Id = configuration.NodeId;
             Configuration = configuration;
             PersistentState = persistentState;
-            m_State = m_State = new Follower(this);
+            //m_State = m_State = new Follower(this);
             m_WrokerThread = new Thread(worker);
-            m_WrokerThread.Start();
             m_VoteSubscription = m_Transport.Subscribe(Id,voteHandler);
             m_AppendEntriesSubscription = m_Transport.Subscribe(Id, appendEntriesHandler);
+            m_Timeout = (int)Math.Round((r.NextDouble() + 1) * Configuration.ElectionTimeout);
+        }
+
+        public void Start()
+        {
+            SwitchToFollower();
+            m_WrokerThread.Start();
         }
 
    
         private void worker(object obj)
         {
             int res = -1;
-            while ((res= WaitHandle.WaitAny(new WaitHandle[] { m_Stop, m_Reset },m_Timeout) ) != 0 )
+            while ((res = WaitHandle.WaitAny(new WaitHandle[] { m_Stop, m_Reset }, m_Timeout)) != 0)
             {
                 switch (res)
                 {
                     case WaitHandle.WaitTimeout:
-                        m_State.Timeout();                        
+                        m_TimeoutWasReset = false;
+                        timeout();                        
                         break;
                     case 1:
                         break;
@@ -87,47 +102,64 @@ namespace Inceptum.Raft
             }
         }
 
-        public void ResetTimeout()
+        private bool m_TimeoutWasReset = false;
+        [MethodImpl(MethodImplOptions.Synchronized)]
+        private void timeout()
+        {
+            if(!m_TimeoutWasReset)
+                m_State.Timeout();
+        }
+
+        Random r=new Random();
+        public void ResetTimeout(double k=1)
         {
             //TODO: random T , 2T
-            m_Timeout = Configuration.ElectionTimeout;
+            m_Timeout = (int) Math.Round((r.NextDouble()+1)*Configuration.ElectionTimeout*k);
+            m_TimeoutWasReset = true;
             m_Reset.Set();
+
         }
      
 
         public void SwitchToCandidate()
         {
             m_State=new Candidate(this);
+            m_State.Enter();
 
         }
 
         public long IncrementTerm()
         {
             //TODO: thread safety
-           return  ++PersistentState.CurrentTerm;
+           PersistentState.CurrentTerm = PersistentState.CurrentTerm + 1;
+           return  PersistentState.CurrentTerm;
         }
 
         public void SwitchToLeader()
         {
             m_State = new Leader(this);
+            m_State.Enter();
         }
 
         public void SwitchToFollower()
         {
             m_State = new Follower(this);
+            m_State.Enter();
         }
 
 
      
-
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest request)
         {
-
+            ResetTimeout();
             if (request.Term > PersistentState.CurrentTerm)
             {
+                Log("Got newer term from leader {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
                 PersistentState.CurrentTerm = request.Term;
                 SwitchToFollower();
             }
+            ResetTimeout();
 
             return new AppendEntriesResponse
             {
@@ -137,18 +169,27 @@ namespace Inceptum.Raft
             };
         }
 
+        [MethodImpl(MethodImplOptions.Synchronized)]
         private RequestVoteResponse voteHandler(Guid nodeId, RequestVoteRequest request)
         {
             if (request.Term > PersistentState.CurrentTerm)
             {
+                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm,request.Term,  request.CandidateId);
                 PersistentState.CurrentTerm = request.Term;
                 SwitchToFollower();
             }
 
+            var granted = m_State.RequestVote(request);
+            if (granted)
+            {
+                PersistentState.VotedFor = request.CandidateId;
+                ResetTimeout();
+
+            }
             return new RequestVoteResponse
             {
                 Term = PersistentState.CurrentTerm,
-                VoteGranted = m_State.RequestVote(request)
+                VoteGranted = granted
             };
         }
 
@@ -196,29 +237,13 @@ namespace Inceptum.Raft
             }
         }
 
+
+       public  static readonly StringBuilder m_Log =new StringBuilder(); 
         public void Log(string format,params object[] args)
         {
-            Console.WriteLine(Id+": "+string.Format(format,args));
+             m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+       //     Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff ") + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
         }
-
-        public void SendHeartBeats()
-        {
-            var request = new AppendEntriesRequest
-            {
-                Term = PersistentState.CurrentTerm,
-                Entries = null,
-                LeaderCommit = CommitIndex,
-                LeaderId = Id,
-                PrevLogIndex = PersistentState.Log.Count - 1,
-                PrevLogTerm = PersistentState.Log.Select(e => e.Term).LastOrDefault()
-            };
-
-            foreach (var node in Configuration.KnownNodes)
-            {
-                var nodeId = node;
-                m_Transport.Send(node, request, response => m_State.ProcessAppendEntriesResponse(nodeId, response));
-            }
-            ResetTimeout();
-        }
+ 
     }
 }
