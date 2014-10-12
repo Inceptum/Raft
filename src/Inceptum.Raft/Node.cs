@@ -123,10 +123,13 @@ namespace Inceptum.Raft
         }
 
         readonly Random m_Random=new Random();
-        public void ResetTimeout(double k=1)
+        public void ResetTimeout(double? k=null)
         {
-            //TODO: random T , 2T
-            m_Timeout = (int) Math.Round((m_Random.NextDouble()+1)*Configuration.ElectionTimeout*k);
+            
+            m_Timeout = k .HasValue
+                ? (int) Math.Round(Configuration.ElectionTimeout*k.Value)
+                //random T , 2T
+                : (int)Math.Round((m_Random.NextDouble() + 1) * Configuration.ElectionTimeout);
             m_TimeoutWasReset = true;
             m_Reset.Set();
 
