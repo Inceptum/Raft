@@ -3,10 +3,10 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Follower : NodeState
+    class Follower<TCommand> : NodeState<TCommand>
     {
 
-        public Follower(Node node)
+        public Follower(Node<TCommand> node)
             : base(node)
         {
         }
@@ -37,7 +37,7 @@ namespace Inceptum.Raft.States
                 Node.PersistentState.IsLogOlderOrEqual(request.LastLogIndex, request.LastLogTerm);
         }
 
-        public override bool AppendEntries(AppendEntriesRequest request)
+        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
         {
 
             //Reply false if term < currentTerm (§5.1)

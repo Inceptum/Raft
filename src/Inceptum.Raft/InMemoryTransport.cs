@@ -24,15 +24,15 @@ namespace Inceptum.Raft
         }
     }
 
-    public class InMemoryTransport:ITransport
+    public class InMemoryTransport<TCommand> : ITransport<TCommand>
     {
-        readonly Dictionary<Guid,Func<Guid, AppendEntriesRequest,AppendEntriesResponse>> m_AppendEntriesSubscriptions=new Dictionary<Guid, Func<Guid, AppendEntriesRequest, AppendEntriesResponse>>();
+        readonly Dictionary<Guid, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse>> m_AppendEntriesSubscriptions = new Dictionary<Guid, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse>>();
         readonly Dictionary<Guid, Func<Guid, RequestVoteRequest, RequestVoteResponse>> m_RequestVoteSubscriptions = new Dictionary<Guid, Func<Guid, RequestVoteRequest, RequestVoteResponse>>();
-        public void Send(Guid id, AppendEntriesRequest request, Action<AppendEntriesResponse> callback)
+        public void Send(Guid id, AppendEntriesRequest<TCommand> request, Action<AppendEntriesResponse> callback)
         {
             Task.Factory.StartNew(() =>
             {
-                Func<Guid, AppendEntriesRequest, AppendEntriesResponse> handler;
+                Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> handler;
                 if (m_AppendEntriesSubscriptions.TryGetValue(id, out handler))
                 {
                     handler(id, request);
@@ -53,7 +53,7 @@ namespace Inceptum.Raft
             });
         }
 
-        public IDisposable Subscribe(Guid id, Func<Guid, AppendEntriesRequest, AppendEntriesResponse> appendEntries)
+        public IDisposable Subscribe(Guid id, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> appendEntries)
         {
             m_AppendEntriesSubscriptions[id] = appendEntries;
             return ActionDisposable.Create(()=>m_AppendEntriesSubscriptions.Remove(id));

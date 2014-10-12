@@ -5,7 +5,7 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Leader : NodeState
+    class Leader<TCommand> : NodeState<TCommand>
     {
 
         /// <summary>
@@ -25,7 +25,7 @@ namespace Inceptum.Raft.States
 
         public Dictionary<Guid, int> LastSentIndex { get; private set; }
 
-        public Leader(Node node)
+        public Leader(Node<TCommand> node)
             : base(node)
         {
             NextIndexes = new Dictionary<Guid, int>();
@@ -41,6 +41,7 @@ namespace Inceptum.Raft.States
             {
                 NextIndexes[node] = Node.PersistentState.Log.Count;
                 MatchIndex[node] = 0;
+                LastSentIndex[node] = 0;
             }
             Node.ResetTimeout(.3);
             Timeout();
@@ -48,12 +49,13 @@ namespace Inceptum.Raft.States
 
         public override void Timeout()
         {
-            Node.Log("I AM LEADER!!!!! Sending HB");
+            Node.Log("I AM THE LEADER!!!!! Sending HB");
             //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
-            var request = new AppendEntriesRequest
+
+            var request = new AppendEntriesRequest<TCommand>
             {
                 Term = Node.PersistentState.CurrentTerm,
-                Entries = null,
+                Entries = new ILogEntry<TCommand>[0],
                 LeaderCommit = Node.CommitIndex,
                 LeaderId = Node.Id,
                 PrevLogIndex = Node.PersistentState.Log.Count - 1,
@@ -73,7 +75,7 @@ namespace Inceptum.Raft.States
             return false;
         }
 
-        public override bool AppendEntries(AppendEntriesRequest request)
+        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
         {
             //Since state is not sitched to follower, requester term is older or same - decline
             return false;
@@ -91,7 +93,7 @@ namespace Inceptum.Raft.States
             {
                 var nextIndex=--NextIndexes[node];
                 var lastSentIndex = Node.PersistentState.Log.Count;
-                var request = new AppendEntriesRequest
+                var request = new AppendEntriesRequest<TCommand>
                 {
                     Term = Node.PersistentState.CurrentTerm,
                     Entries = Node.PersistentState.Log.GetRange(nextIndex, lastSentIndex-nextIndex),

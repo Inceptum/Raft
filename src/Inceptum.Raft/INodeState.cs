@@ -3,13 +3,13 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft
 {
-    interface INodeState
+    interface INodeState<TCommand>
     {
         void Enter();
         void Timeout();
         bool RequestVote(RequestVoteRequest request);
         void ProcessVote(Guid node,RequestVoteResponse vote);
-        bool AppendEntries(AppendEntriesRequest request);
+        bool AppendEntries(AppendEntriesRequest<TCommand> request);
         void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response);
     }
 }

@@ -5,16 +5,18 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Candidate : NodeState
+    class Candidate<TCommand> : NodeState<TCommand>
     {
         private Dictionary<Guid, RequestVoteResponse> m_Votes;
 
-        public Candidate(Node node):base(node)
+        public Candidate(Node<TCommand> node)
+            : base(node)
         {
         }
 
         public override void Enter()
         {
+           
             //On conversion to candidate, start election
             startElection();
             Node.Log("I am candidate");
@@ -56,14 +58,17 @@ namespace Inceptum.Raft.States
 
         public override void ProcessVote(Guid node, RequestVoteResponse vote)
         {
-            if(m_Votes.ContainsKey(node))
-                Console.WriteLine("!!!");
-            m_Votes[node]=vote;
-            if(m_Votes.Values.Count(v=>v.VoteGranted)>=Node.Configuration.Majority)
-                Node.SwitchToLeader();
+            lock (m_Votes)
+            {
+                if (m_Votes.ContainsKey(node))
+                    Console.WriteLine("!!!");
+                m_Votes[node] = vote;
+                if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
+                    Node.SwitchToLeader();
+            }
         }
 
-        public override bool AppendEntries(AppendEntriesRequest request)
+        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
         {
             //term in request is not newer than our (otherwise state should have been already changed to follower)
             return false;

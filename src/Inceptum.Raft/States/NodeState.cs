@@ -3,11 +3,11 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    abstract class NodeState : INodeState
+    abstract class NodeState<TCommand> : INodeState<TCommand>
     {
-        protected Node Node { get; private set; }
+        protected Node<TCommand> Node { get; private set; }
 
-        protected NodeState(Node node)
+        protected NodeState(Node<TCommand> node)
         {
             Node = node;
         }
@@ -21,7 +21,7 @@ namespace Inceptum.Raft.States
             Node.Log("Ignoring RequestVoteResponse since node is not a candidate");
             
         }
-        public abstract bool AppendEntries(AppendEntriesRequest request);
+        public abstract bool AppendEntries(AppendEntriesRequest<TCommand> request);
 
         public virtual void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response)
         {

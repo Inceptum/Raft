@@ -6,7 +6,7 @@ namespace Inceptum.Raft
     /// <summary>
     /// Raft node persistent state
     /// </summary>
-    public class PersistentState
+    public class PersistentState<TCommand>
     {
         private long m_CurrentTerm;
 
@@ -45,17 +45,21 @@ namespace Inceptum.Raft
         /// <value>
         /// The log.
         /// </value>
-        public List<ILogEntry<object>> Log { get; private set; }
+        public List<ILogEntry<TCommand>> Log { get; private set; }
 
         public PersistentState()
         {
-            Log=new List<ILogEntry<object>>();
+            Log = new List<ILogEntry<TCommand>>();
         }
 
         public bool EntryTermMatches(int prevLogIndex, long prevLogTerm)
         {
-            if (prevLogIndex < 0 || prevLogIndex >= Log.Count)
+            if (prevLogIndex < 0 && Log.Count == 0)
+                return prevLogIndex == -1;
+
+            if ( prevLogIndex >= Log.Count)
                 return false;
+
             return Log[prevLogIndex].Term == prevLogTerm;
         }
 
@@ -66,7 +70,7 @@ namespace Inceptum.Raft
                 Log.RemoveRange(index, Log.Count - index);
         }
 
-        public void Append(IEnumerable<ILogEntry<object>> entries)
+        public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {
             Log.AddRange(entries);
         }

@@ -29,10 +29,10 @@ namespace Inceptum.Raft
         }
     }
 
-    public class Node : IDisposable
+    public class Node<TCommand> : IDisposable 
     {
-        INodeState m_State;
-        internal  NodeConfiguration Configuration { get; private set; }
+        INodeState<TCommand> m_State;
+        public  NodeConfiguration Configuration { get; private set; }
 
         /// <summary>
         /// Gets or sets the state of the persistent.
@@ -40,7 +40,7 @@ namespace Inceptum.Raft
         /// <value>
         /// The state of the persistent.
         /// </value>
-        internal PersistentState PersistentState{ get; private set; }
+        internal PersistentState<TCommand> PersistentState { get; private set; }
         /// <summary>
         /// Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)        /// </summary>
         /// <value>
@@ -54,6 +54,9 @@ namespace Inceptum.Raft
         /// The last applied  log entry index.
         /// </value>
         public long LastApplied { get; private set; }
+        
+        
+        public Guid? LeaderId { get; private set; }
 
         public Guid Id { get; private set; }
 
@@ -61,11 +64,16 @@ namespace Inceptum.Raft
         readonly AutoResetEvent m_Reset = new AutoResetEvent(false);
         readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
         private int m_Timeout;
-        private readonly ITransport m_Transport;
+        private readonly ITransport<TCommand> m_Transport;
         private readonly IDisposable m_VoteSubscription;
         private readonly IDisposable m_AppendEntriesSubscription;
 
-        public Node(PersistentState persistentState, NodeConfiguration configuration,ITransport transport)
+        public string State
+        {
+            get { return m_State.GetType().Name.Split('`').First(); }
+        }
+
+        public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport<TCommand> transport)
         {
             m_Transport = transport;
             Id = configuration.NodeId;
@@ -75,15 +83,19 @@ namespace Inceptum.Raft
             m_WrokerThread = new Thread(worker);
             m_VoteSubscription = m_Transport.Subscribe(Id,voteHandler);
             m_AppendEntriesSubscription = m_Transport.Subscribe(Id, appendEntriesHandler);
-            m_Timeout = (int)Math.Round((r.NextDouble() + 1) * Configuration.ElectionTimeout);
+            m_Timeout = (int)Math.Round((m_Random.NextDouble() + 1) * Configuration.ElectionTimeout);
         }
 
         public void Start()
         {
-            SwitchToFollower();
+            SwitchToFollower(null);
             m_WrokerThread.Start();
         }
 
+        public void Apply(TCommand Command)
+        {
+            
+        }
    
         private void worker(object obj)
         {
@@ -110,11 +122,11 @@ namespace Inceptum.Raft
                 m_State.Timeout();
         }
 
-        Random r=new Random();
+        readonly Random m_Random=new Random();
         public void ResetTimeout(double k=1)
         {
             //TODO: random T , 2T
-            m_Timeout = (int) Math.Round((r.NextDouble()+1)*Configuration.ElectionTimeout*k);
+            m_Timeout = (int) Math.Round((m_Random.NextDouble()+1)*Configuration.ElectionTimeout*k);
             m_TimeoutWasReset = true;
             m_Reset.Set();
 
@@ -123,7 +135,8 @@ namespace Inceptum.Raft
 
         public void SwitchToCandidate()
         {
-            m_State=new Candidate(this);
+            LeaderId = null;
+            m_State = new Candidate<TCommand>(this);
             m_State.Enter();
 
         }
@@ -137,30 +150,38 @@ namespace Inceptum.Raft
 
         public void SwitchToLeader()
         {
-            m_State = new Leader(this);
+            LeaderId = Id;
+            m_State = new Leader<TCommand>(this);
             m_State.Enter();
         }
 
-        public void SwitchToFollower()
+        public void SwitchToFollower(Guid? leaderId)
         {
-            m_State = new Follower(this);
+            LeaderId = leaderId;
+            m_State = new Follower<TCommand>(this);
             m_State.Enter();
         }
 
 
      
         [MethodImpl(MethodImplOptions.Synchronized)]
-        private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest request)
+        private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest<TCommand> request)
         {
             ResetTimeout();
-            if (request.Term > PersistentState.CurrentTerm)
+            
+            if (request.Term >= PersistentState.CurrentTerm)
             {
                 Log("Got newer term from leader {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
                 PersistentState.CurrentTerm = request.Term;
-                SwitchToFollower();
+                SwitchToFollower(request.LeaderId);
             }
+           /* else
+            {
+                Log("Not switching Got {1} term from leader {2}. Current: {0}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
+   
+            }*/
             ResetTimeout();
-
+          
             return new AppendEntriesResponse
             {
                 Success = m_State.AppendEntries(request),
@@ -176,7 +197,7 @@ namespace Inceptum.Raft
             {
                 Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm,request.Term,  request.CandidateId);
                 PersistentState.CurrentTerm = request.Term;
-                SwitchToFollower();
+                SwitchToFollower(null);
             }
 
             var granted = m_State.RequestVote(request);
@@ -193,7 +214,7 @@ namespace Inceptum.Raft
             };
         }
 
-        public void AppendEntries(Guid node, AppendEntriesRequest request)
+        public void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
         {
             m_Transport.Send(node, request, response => m_State.ProcessAppendEntriesResponse(node, response));
         }
@@ -228,10 +249,11 @@ namespace Inceptum.Raft
 
         public void Commit(long leaderCommit)
         {
+            Log("Got HB from leader:{0}",LeaderId);
             for (int i = CommitIndex+1; i <=Math.Min(leaderCommit,PersistentState.Log.Count-1); i++)
             {
                 //TODO: actual commit logic
-                Console.WriteLine(PersistentState.Log[i].Command);
+                Console.WriteLine("APPLY: " + PersistentState.Log[i].Command);
                 CommitIndex = i;
                 LastApplied = i;
             }
