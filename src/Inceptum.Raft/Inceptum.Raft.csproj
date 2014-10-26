@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="InMemoryTransport.cs" />
     <Compile Include="ITransport.cs" />
+    <Compile Include="NodeConfiguration.cs" />
     <Compile Include="States\NodeState.cs" />
     <Compile Include="Rpc\AppendEntriesRequest.cs" />
     <Compile Include="States\Candidate.cs" />

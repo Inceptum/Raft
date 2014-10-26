@@ -6,11 +6,14 @@ namespace Inceptum.Raft.States
     abstract class NodeState<TCommand> : INodeState<TCommand>
     {
         protected Node<TCommand> Node { get; private set; }
+        public NodeState State { get; private set; }
 
-        protected NodeState(Node<TCommand> node)
+        protected NodeState(Node<TCommand> node,NodeState state)
         {
+            State = state;
             Node = node;
         }
+
 
         public abstract void Enter();
         public abstract void Timeout();

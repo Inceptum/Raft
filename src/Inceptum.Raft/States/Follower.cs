@@ -7,9 +7,10 @@ namespace Inceptum.Raft.States
     {
 
         public Follower(Node<TCommand> node)
-            : base(node)
+            : base(node,NodeState.Follower)
         {
         }
+
 
 
         public override void Enter()

@@ -5,6 +5,7 @@ namespace Inceptum.Raft
 {
     interface INodeState<TCommand>
     {
+        NodeState State { get; }
         void Enter();
         void Timeout();
         bool RequestVote(RequestVoteRequest request);

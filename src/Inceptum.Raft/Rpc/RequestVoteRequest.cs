@@ -3,11 +3,13 @@
 namespace Inceptum.Raft.Rpc
 {
     /// <summary>
-    /// Request for RequestVote RPC. Invoked by candidates to gather votes (§5.2).    /// </summary>
+    /// Request for RequestVote RPC. Invoked by candidates to gather votes (§5.2).
+    /// </summary>
     public class RequestVoteRequest
     {
         /// <summary>
-        /// Gets or sets the candidate’s term        /// </summary>
+        /// Gets or sets the candidate’s term
+        /// </summary>
         /// <value>
         /// The term.
         /// </value>

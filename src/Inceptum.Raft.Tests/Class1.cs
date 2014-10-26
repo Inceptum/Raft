@@ -8,11 +8,47 @@ using NUnit.Framework;
 
 namespace Inceptum.Raft.Tests
 {
+    class NodeStateObserver : IObserver<NodeState>
+    {
+        public long LeaderCount { get; private set; }
+        public long FollowerCount { get; private set; }
+        public long CandidateCount { get; private set; }
+        object m_SyncRoot=new object();
+
+        public void OnNext(NodeState value)
+        {
+            switch (value)
+            {
+                case NodeState.Candidate:
+                    CandidateCount++;
+                    break;
+                case NodeState.Leader:
+                    LeaderCount++;
+                    break;
+                case NodeState.Follower:
+                    FollowerCount++;
+                    break;
+            }
+        }
+
+        public void OnError(Exception error)
+        {
+            
+        }
+
+        public void OnCompleted()
+        {
+             
+        }
+    }
+
     [TestFixture]
     public class Class1
     {
+        private static int counter = 0;
+
         [Test]
-        [Repeat(300)]
+     //   [Repeat(10000)]
         public void Test()
         {
             Node<object>.m_Log.Clear();
@@ -42,7 +78,7 @@ namespace Inceptum.Raft.Tests
                     node.Start();
                 }
 
-                Thread.Sleep(3000);
+                Thread.Sleep(300000);
 
                 var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
                 foreach (var node in nodes)
@@ -58,9 +94,9 @@ namespace Inceptum.Raft.Tests
                     }
                 }
 
-                Assert.That(nodeStates.Count(n => n.State == "Leader"), Is.LessThan(2), "There are more then one Leader after election");
-                Assert.That(nodeStates.Count(n => n.State == "Leader"), Is.GreaterThan(0), "There is no Leader after election");
-                Assert.That(nodeStates.Count(n => n.State == "Candidate"), Is.EqualTo(0), "There are Candidates  after election");
+                Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.LessThan(2), "There are more then one Leader after election");
+                Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.GreaterThan(0), "There is no Leader after election");
+                Assert.That(nodeStates.Count(n => n.State == NodeState.Candidate), Is.EqualTo(0), "There are Candidates  after election");
                 Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
             }
             catch
@@ -76,12 +112,14 @@ namespace Inceptum.Raft.Tests
 
             finally
             {
+                if(++counter%100==0)
+                    Console.WriteLine(DateTime.Now+" "+counter);
                          /*       Console.WriteLine(".");
 Console.WriteLine();
                 Console.WriteLine();
                 Console.WriteLine();
-                Console.WriteLine();
-                Console.WriteLine(Node<object>.m_Log);*/
+                Console.WriteLine();*/
+                Console.WriteLine(Node<object>.m_Log);
             }
         }
     }

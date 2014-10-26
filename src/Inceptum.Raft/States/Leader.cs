@@ -26,7 +26,7 @@ namespace Inceptum.Raft.States
         public Dictionary<Guid, int> LastSentIndex { get; private set; }
 
         public Leader(Node<TCommand> node)
-            : base(node)
+            : base(node,NodeState.Leader)
         {
             NextIndexes = new Dictionary<Guid, int>();
             MatchIndex = new Dictionary<Guid, int>();

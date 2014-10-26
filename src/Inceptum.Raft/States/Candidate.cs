@@ -10,9 +10,10 @@ namespace Inceptum.Raft.States
         private Dictionary<Guid, RequestVoteResponse> m_Votes;
 
         public Candidate(Node<TCommand> node)
-            : base(node)
+            : base(node,NodeState.Candidate)
         {
         }
+
 
         public override void Enter()
         {
@@ -37,7 +38,7 @@ namespace Inceptum.Raft.States
                     }
                 }
             };
-            //TODO: Grappy code, two places where votedFor is set...
+            //TODO: Crappy code, two places where votedFor is set...
             Node.PersistentState.VotedFor = Node.Id;
 
             Node.RequestVotes();
