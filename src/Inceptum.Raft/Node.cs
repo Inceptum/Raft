@@ -128,7 +128,7 @@ namespace Inceptum.Raft
             {
                 var timeoutBase = m_TimeoutBase;
                 res = WaitHandle.WaitAny(new WaitHandle[] {m_Stop, m_Reset}, timeoutBase);
-                //In case if there was delay in switching context to the thread and timeout was reached in spite of reset event was set
+                //If CPU is loaded it is possible that after m_Reset is set, context would be swithed after timout has ended.
                 res = m_Reset.WaitOne(0) ? 1 : res;
 
                 if (res == WaitHandle.WaitTimeout)
@@ -247,7 +247,6 @@ namespace Inceptum.Raft
                 SwitchToFollower(request.LeaderId);
             }
 
-            ResetTimeout();
             m_Transport.Send(request.LeaderId, new AppendEntriesResponse
             {
                 Success = m_State.AppendEntries(request),
@@ -306,7 +305,7 @@ namespace Inceptum.Raft
 
         public void Log(string format, params object[] args)
         {
-        //    m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") +string.Format(" {{{0:00}}}",Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+             m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") +string.Format(" {{{0:00}}}",Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
         }
     }
 }

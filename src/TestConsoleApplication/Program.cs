@@ -14,7 +14,7 @@ namespace TestConsoleApplication
     {
         private static void Main(string[] args)
         {
-            Test(150);
+            Test(300);
         }
 
         private static void Test(int electionTimeout)
@@ -48,31 +48,32 @@ namespace TestConsoleApplication
 
                 var tokenSource2 = new CancellationTokenSource();
                 CancellationToken ct = tokenSource2.Token;
-               
+
+                StringBuilder log=new StringBuilder();
                 Task.Factory.StartNew(() =>
                 {
                     long cterm = 0;
-                    while (cterm<4)
+                    while (true)
                     {
                         var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration, node.CurrentTerm}).ToArray();
-                        Console.WriteLine(DateTime.Now);
+
+                        Console.Write(log.ToString());
+                        Console.WriteLine("[{3:000}] {0} - {1} ({2})", start, DateTime.Now, DateTime.Now - start, cterm);
                         foreach (var node in nodeStates)
                         {
-                            cterm = Math.Max(cterm, node.CurrentTerm);
-                            Console.WriteLine(string.Format("[{3}] {0}: {1}\tLeader:{2}", node.Id, node.State, node.LeaderId, node.CurrentTerm));
-                            foreach (var knownNode in node.Configuration.KnownNodes)
+                            if (node.CurrentTerm > cterm)
                             {
-                                //sb.AppendLine(string.Format("\t{0}", knownNode));
+                                log.AppendLine(string.Format("[{3:000}] {0} - {1} ({2})", start, DateTime.Now, DateTime.Now - start,cterm));
+                                cterm = node.CurrentTerm;
                             }
+                            Console.WriteLine(string.Format("[{3}] {0}: {1}\tLeader:{2}", node.Id, node.State, node.LeaderId, node.CurrentTerm));
                         }
                         Console.WriteLine();
                         Thread.Sleep(1000);
                     }
-                    File.WriteAllText("out.log", Node<object>.m_Log.ToString());
-                    Console.WriteLine("Term is greater then 4");
-                    
                 },ct);
 
+               
                 Console.ReadLine();
                 tokenSource2.Cancel();
 
