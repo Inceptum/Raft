@@ -43,8 +43,9 @@ namespace Inceptum.Raft.States
                 MatchIndex[node] = 0;
                 LastSentIndex[node] = 0;
             }
-            Node.ResetTimeout(.3);
+            Node.ResetTimeout(.5);
             Timeout();
+            base.Enter();
         }
 
         public override void Timeout()

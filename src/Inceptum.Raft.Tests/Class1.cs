@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -48,15 +49,14 @@ namespace Inceptum.Raft.Tests
         private static int counter = 0;
 
         [Test]
-     //   [Repeat(10000)]
-        public void Test()
+        [Repeat(50)]
+        public void ConsensusIsReachableWithin10ElectionTimeoutsTest()
         {
             Node<object>.m_Log.Clear();
             var sb=new StringBuilder();
             try
             {
-                var inMemoryTransport = new InMemoryTransport<object>();
-                var knownNodes = new List<Guid>
+                 var knownNodes = new List<Guid>
                 {
                     Guid.Parse("AE34F270-A72B-4D23-9BBE-C660403690E0"),
                     Guid.Parse("DAA588C4-26DD-451F-865C-5591E78994FB"),
@@ -65,20 +65,23 @@ namespace Inceptum.Raft.Tests
                     Guid.Parse("1DF25C51-29DD-4A00-AD26-0198B09DA036")
                 };
 
+                 var inMemoryTransport = new InMemoryTransport<object>(knownNodes.ToArray());
+
                 //   knownNodes = Enumerable.Range(1, 101).Select(z => Guid.NewGuid()).ToList();
 
                 var nodes = knownNodes.Select(
                     id =>
-                        new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = 300},
+                        new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = 150},
                             inMemoryTransport))
                     .ToArray();
 
+                var start = DateTime.Now;
                 foreach (var node in nodes)
                 {
                     node.Start();
                 }
 
-                Thread.Sleep(300000);
+                Thread.Sleep(3000);
 
                 var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
                 foreach (var node in nodes)
@@ -97,7 +100,14 @@ namespace Inceptum.Raft.Tests
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.LessThan(2), "There are more then one Leader after election");
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.GreaterThan(0), "There is no Leader after election");
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Candidate), Is.EqualTo(0), "There are Candidates  after election");
-                Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
+         //       Assert.That(nodes.Select(n=>n.CurrentTerm).Distinct().Count(), Is.EqualTo(1), "Tearm is not the same for all nodes");
+                var term = nodes.Select(n=>n.CurrentTerm).First();
+
+              //  Assert.That(term, Is.LessThan(8), "There are Candidates  after election");
+/*                Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
+*/
+                
+                Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds, term);
             }
             catch
             {
@@ -119,7 +129,7 @@ Console.WriteLine();
                 Console.WriteLine();
                 Console.WriteLine();
                 Console.WriteLine();*/
-                Console.WriteLine(Node<object>.m_Log);
+                //Console.WriteLine(Node<object>.m_Log);
             }
         }
     }

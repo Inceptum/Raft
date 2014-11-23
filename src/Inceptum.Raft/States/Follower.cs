@@ -16,8 +16,9 @@ namespace Inceptum.Raft.States
         public override void Enter()
         {
             Node.Log("I am follower");
-
             Node.ResetTimeout();
+            base.Enter();
+
         }
 
         public override void Timeout()

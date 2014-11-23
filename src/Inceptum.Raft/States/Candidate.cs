@@ -21,6 +21,7 @@ namespace Inceptum.Raft.States
             //On conversion to candidate, start election
             startElection();
             Node.Log("I am candidate");
+            base.Enter();
         }
 
         private void startElection()

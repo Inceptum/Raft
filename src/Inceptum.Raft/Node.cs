@@ -25,7 +25,6 @@ namespace Inceptum.Raft
         private readonly ITransport<TCommand> m_Transport;
         private readonly IDisposable m_VoteSubscription;
         private readonly IDisposable m_AppendEntriesSubscription;
-        private bool m_TimeoutWasReset = false;
         readonly Random m_Random=new Random();
         public  static readonly StringBuilder m_Log =new StringBuilder();
         public  NodeConfiguration Configuration { get; private set; }
@@ -50,8 +49,7 @@ namespace Inceptum.Raft
         /// The last applied  log entry index.
         /// </value>
         public long LastApplied { get; private set; }
-        
-        
+
         public Guid? LeaderId { get; private set; }
 
         public Guid Id { get; private set; }
@@ -60,6 +58,8 @@ namespace Inceptum.Raft
         {
             get { return m_State.State; }
         }
+        public long CurrentTerm { get { return PersistentState.CurrentTerm; } }
+        public DateTime CurrentStateEnterTime { get { return m_State.EnterTime; } }
 
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport<TCommand> transport)
         {
@@ -81,7 +81,7 @@ namespace Inceptum.Raft
 
         public void Apply(TCommand command)
         {
-            
+            //TODO: proxy to leader
         }
    
         private void worker(object obj)
@@ -94,7 +94,7 @@ namespace Inceptum.Raft
             }
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
+//        [MethodImpl(MethodImplOptions.Synchronized)]
         private void timeout()
         {
             m_State.Timeout();
@@ -102,13 +102,18 @@ namespace Inceptum.Raft
 
         public void ResetTimeout(double? k=null)
         {
-            m_TimeoutBase = (int) ((k??1.0)*Configuration.ElectionTimeout);
-/*
-            m_TimeoutBase = k .HasValue
-                ? (int) Math.Round(Configuration.ElectionTimeout*k.Value)
-                //random T , 2T
-                : (int)Math.Round((m_Random.NextDouble() + 1) * Configuration.ElectionTimeout);
-*/
+            if (k.HasValue)
+            {
+                m_TimeoutBase = (int) Math.Round(Configuration.ElectionTimeout*k.Value);
+                return;
+            }
+
+
+            //random T , 2T
+            var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
+            int rnd = rndNum.Next(0, Configuration.ElectionTimeout);
+            m_TimeoutBase = rnd + Configuration.ElectionTimeout;
+                
             m_Reset.Set();
 
         }
@@ -148,7 +153,7 @@ namespace Inceptum.Raft
 
 
      
-        [MethodImpl(MethodImplOptions.Synchronized)]
+  //      [MethodImpl(MethodImplOptions.Synchronized)]
         private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest<TCommand> request)
         {
             ResetTimeout();
@@ -162,13 +167,7 @@ namespace Inceptum.Raft
             {
                     SwitchToFollower(request.LeaderId);
             }
-        
-
-           /* else
-            {
-                Log("Not switching Got {1} term from leader {2}. Current: {0}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
    
-            }*/
             ResetTimeout();
           
             return new AppendEntriesResponse
@@ -179,7 +178,7 @@ namespace Inceptum.Raft
             };
         }
 
-        [MethodImpl(MethodImplOptions.Synchronized)]
+ //       [MethodImpl(MethodImplOptions.Synchronized)]
         private RequestVoteResponse voteHandler(Guid nodeId, RequestVoteRequest request)
         {
             if (request.Term > PersistentState.CurrentTerm)
@@ -252,9 +251,6 @@ namespace Inceptum.Raft
         public void Log(string format,params object[] args)
         {
              m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
-       //     Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff ") + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
         }
-
-     
     }
 }

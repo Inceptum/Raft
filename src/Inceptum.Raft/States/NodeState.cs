@@ -7,6 +7,7 @@ namespace Inceptum.Raft.States
     {
         protected Node<TCommand> Node { get; private set; }
         public NodeState State { get; private set; }
+        public DateTime EnterTime { get; private set; }
 
         protected NodeState(Node<TCommand> node,NodeState state)
         {
@@ -15,7 +16,10 @@ namespace Inceptum.Raft.States
         }
 
 
-        public abstract void Enter();
+        public virtual void Enter()
+        {
+            EnterTime = DateTime.Now;
+        }
         public abstract void Timeout();
         public abstract bool RequestVote(RequestVoteRequest request);
 
