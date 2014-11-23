@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 using Inceptum.Raft.States;
 
@@ -61,6 +62,8 @@ namespace Inceptum.Raft
         public long CurrentTerm { get { return PersistentState.CurrentTerm; } }
         public DateTime CurrentStateEnterTime { get { return m_State.EnterTime; } }
 
+        private LimitedConcurrencyLevelTaskScheduler m_Scheduler=new LimitedConcurrencyLevelTaskScheduler(1);
+
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport<TCommand> transport)
         {
             m_Transport = transport;
@@ -68,7 +71,15 @@ namespace Inceptum.Raft
             Configuration = configuration;
             PersistentState = persistentState;
             m_WrokerThread = new Thread(worker);
-            m_VoteSubscription = m_Transport.Subscribe(Id,voteHandler);
+            m_VoteSubscription = m_Transport.Subscribe(Id, voteHandler);
+          /*  m_VoteSubscription = m_Transport.Subscribe(Id, (guid, request) =>
+            {
+                Task.Factory.StartNew(() =>
+                {
+                    voteHandler(guid, request);
+                }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler);
+            });*/
+               
             m_AppendEntriesSubscription = m_Transport.Subscribe(Id, appendEntriesHandler);
             m_TimeoutBase = Configuration.ElectionTimeout;
         }
@@ -86,8 +97,9 @@ namespace Inceptum.Raft
    
         private void worker(object obj)
         {
-            int res = -1;
-            while ((res = WaitHandle.WaitAny(new WaitHandle[] { m_Stop, m_Reset }, (int)Math.Round((m_Random.NextDouble() + 1) * m_TimeoutBase))) != 0)
+            int res;
+
+            while ((res = WaitHandle.WaitAny(new WaitHandle[] { m_Stop, m_Reset },  m_TimeoutBase)) != 0)
             {
                 if (res == WaitHandle.WaitTimeout)
                     timeout();
@@ -136,7 +148,7 @@ namespace Inceptum.Raft
         public void SwitchToLeader()
         {
             LeaderId = Id;
-           switchTo(new Leader<TCommand>(this) );
+            switchTo(new Leader<TCommand>(this) );
         }
 
         public void SwitchToFollower(Guid? leaderId)
@@ -204,7 +216,7 @@ namespace Inceptum.Raft
 
         public void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
         {
-            m_Transport.Send(node, request, response => m_State.ProcessAppendEntriesResponse(node, response));
+            m_Transport.Send(Id,node, request, response => m_State.ProcessAppendEntriesResponse(node, response));
         }
 
 
@@ -221,7 +233,7 @@ namespace Inceptum.Raft
             foreach (var node in Configuration.KnownNodes)
             {
                 var nodeId = node;
-                m_Transport.Send(node, request, response => m_State.ProcessVote(nodeId, response));
+                m_Transport.Send(this.Id,node, request, response => m_State.ProcessVote(nodeId, response));
             }
         }
 

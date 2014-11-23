@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -49,7 +50,7 @@ namespace Inceptum.Raft.Tests
         private static int counter = 0;
 
         [Test]
-        [Repeat(50)]
+        [Repeat(100)]
         public void ConsensusIsReachableWithin10ElectionTimeoutsTest()
         {
             Node<object>.m_Log.Clear();
@@ -107,7 +108,7 @@ namespace Inceptum.Raft.Tests
 /*                Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
 */
                 
-                Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds, term);
+                Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds.ToString().Replace(".",","), term);
             }
             catch
             {

@@ -39,29 +39,29 @@ namespace Inceptum.Raft
             }
         }
 
-        public void Send(Guid id, AppendEntriesRequest<TCommand> request, Action<AppendEntriesResponse> callback)
+        public void Send(Guid from, Guid to, AppendEntriesRequest<TCommand> request, Action<AppendEntriesResponse> callback)
         {
             Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> handler;
-            if (m_AppendEntriesSubscriptions.TryGetValue(id, out handler))
+            if (m_AppendEntriesSubscriptions.TryGetValue(to, out handler))
             {
                 Task.Factory.StartNew(() =>
                 {
-                    handler(id, request);
-                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(id));
+                    var response = handler(to, request);
+                    Task.Factory.StartNew(() => callback(response), CancellationToken.None, TaskCreationOptions.None, getScheduler(from));
+                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(to));
             }
         }
 
-        public void Send(Guid id, RequestVoteRequest request, Action<RequestVoteResponse> callback)
+        public void Send(Guid from, Guid to, RequestVoteRequest request, Action<RequestVoteResponse> callback)
         {
             Func<Guid, RequestVoteRequest, RequestVoteResponse> handler;
-            if (m_RequestVoteSubscriptions.TryGetValue(id, out handler))
+            if (m_RequestVoteSubscriptions.TryGetValue(to, out handler))
             {
                 Task.Factory.StartNew(() =>
                 {
-
-                    var response = handler(id, request);
-                    callback(response);
-                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(id));
+                    var response = handler(to, request);
+                    Task.Factory.StartNew(() => callback(response), CancellationToken.None, TaskCreationOptions.None, getScheduler(from));
+                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(to));
             }
         }
 
