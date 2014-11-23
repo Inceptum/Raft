@@ -58,16 +58,14 @@ namespace Inceptum.Raft.States
             return false;
         }
 
-        public override void ProcessVote( RequestVoteResponse vote)
+        public override void ProcessVote(RequestVoteResponse vote)
         {
-            lock (m_Votes)
-            {
-                if (m_Votes.ContainsKey(vote.NodeId))
-                    Console.WriteLine("!!!");
-                m_Votes[vote.NodeId] = vote;
-                if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
-                    Node.SwitchToLeader();
-            }
+            if (m_Votes.ContainsKey(vote.NodeId))
+                Console.WriteLine("!!!");
+            m_Votes[vote.NodeId] = vote;
+            if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
+                Node.SwitchToLeader();
+
         }
 
         public override bool AppendEntries(AppendEntriesRequest<TCommand> request)

@@ -23,8 +23,6 @@ namespace Inceptum.Raft.States
 
         public override void Timeout()
         {
-            if (Node.CurrentTerm >= 2)
-                System.IO.File.WriteAllText("out.log", Node<object>.m_Log.ToString());
             Node.Log("No Append entries within timeout. ");
             Node.SwitchToCandidate();
         }

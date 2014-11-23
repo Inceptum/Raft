@@ -12,9 +12,10 @@ namespace TestConsoleApplication
 {
     class Program
     {
+        private static  PerformanceCounter m_CpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); 
         private static void Main(string[] args)
         {
-            Test(300);
+            Test(150);
         }
 
         private static void Test(int electionTimeout)
@@ -58,18 +59,19 @@ namespace TestConsoleApplication
                         var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration, node.CurrentTerm}).ToArray();
 
                         Console.Write(log.ToString());
-                        Console.WriteLine("[{3:000}] {0} - {1} ({2})", start, DateTime.Now, DateTime.Now - start, cterm);
+                        Console.WriteLine("[{3:000}] {0} - {1} ({2}) CPU: {4:00}%", start, DateTime.Now, DateTime.Now - start, cterm,m_CpuCounter.NextValue());
                         foreach (var node in nodeStates)
                         {
                             if (node.CurrentTerm > cterm)
                             {
-                                log.AppendLine(string.Format("[{3:000}] {0} - {1} ({2})", start, DateTime.Now, DateTime.Now - start,cterm));
+                                log.AppendLine(string.Format("[{3:000}] {0} - {1} ({2}) CPU: {4:00}%", start, DateTime.Now, DateTime.Now - start, cterm, m_CpuCounter.NextValue()));
                                 cterm = node.CurrentTerm;
+                                start = DateTime.Now;
                             }
-                            Console.WriteLine(string.Format("[{3}] {0}: {1}\tLeader:{2}", node.Id, node.State, node.LeaderId, node.CurrentTerm));
+                            Console.WriteLine("[{3}] {0}: {1}\tLeader:{2}", node.Id, node.State, node.LeaderId, node.CurrentTerm);
                         }
                         Console.WriteLine();
-                        Thread.Sleep(1000);
+                        Thread.Sleep(500);
                     }
                 },ct);
 
