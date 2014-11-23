@@ -7,9 +7,8 @@ namespace Inceptum.Raft
 {
     public interface ITransport<TCommand>
     {
-        void Send(Guid from, Guid to, AppendEntriesRequest<TCommand> request, Action<AppendEntriesResponse> callback);
-        void Send(Guid from, Guid to, RequestVoteRequest request, Action<RequestVoteResponse> callback);
-        IDisposable Subscribe(Guid id, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> appendEntries);
-        IDisposable Subscribe(Guid id, Func<Guid, RequestVoteRequest, RequestVoteResponse> requestVote);
+        void Send<T>(Guid to, T message);
+        IDisposable Subscribe<T>(Guid subscriberId, Action<T> handler);
+ 
     }
 }

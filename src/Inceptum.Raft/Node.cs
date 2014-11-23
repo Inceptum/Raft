@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,12 +13,12 @@ using Inceptum.Raft.States;
 namespace Inceptum.Raft
 {
     public enum NodeState
-	{
+    {
         Leader,
         Candidate,
         Follower
-	}
-    public class Node<TCommand> : IDisposable 
+    }
+    public class Node<TCommand> : IDisposable
     {
         INodeState<TCommand> m_State;
         readonly Thread m_WrokerThread;
@@ -24,12 +26,11 @@ namespace Inceptum.Raft
         readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
         private int m_TimeoutBase;
         private readonly ITransport<TCommand> m_Transport;
-        private readonly IDisposable m_VoteSubscription;
-        private readonly IDisposable m_AppendEntriesSubscription;
-        readonly Random m_Random=new Random();
-        public  static readonly StringBuilder m_Log =new StringBuilder();
-        public  NodeConfiguration Configuration { get; private set; }
-        
+        private readonly IDisposable[] m_Subscriptions;
+        readonly Random m_Random = new Random();
+        public static readonly StringBuilder m_Log = new StringBuilder();
+        public NodeConfiguration Configuration { get; private set; }
+
         /// <summary>
         /// Gets or sets the state of the persistent.
         /// </summary>
@@ -38,11 +39,12 @@ namespace Inceptum.Raft
         /// </value>
         internal PersistentState<TCommand> PersistentState { get; private set; }
         /// <summary>
-        /// Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)        /// </summary>
+        /// Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)
+        /// </summary>
         /// <value>
         /// The index of the commit.
         /// </value>
-        public int CommitIndex { get;  private  set; }
+        public int CommitIndex { get; private set; }
         /// <summary>
         /// Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
         /// </summary>
@@ -62,81 +64,94 @@ namespace Inceptum.Raft
         public long CurrentTerm { get { return PersistentState.CurrentTerm; } }
         public DateTime CurrentStateEnterTime { get { return m_State.EnterTime; } }
 
-        private LimitedConcurrencyLevelTaskScheduler m_Scheduler=new LimitedConcurrencyLevelTaskScheduler(1);
+        //private readonly LimitedConcurrencyLevelTaskScheduler m_Scheduler = new LimitedConcurrencyLevelTaskScheduler(1);
+        private readonly TaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ApartmentState.MTA);
 
+        private object m_SyncRoot=new object();
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport<TCommand> transport)
         {
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
             PersistentState = persistentState;
-            m_WrokerThread = new Thread(worker);
-            m_VoteSubscription = m_Transport.Subscribe(Id, voteHandler);
-          /*  m_VoteSubscription = m_Transport.Subscribe(Id, (guid, request) =>
+            m_WrokerThread = new Thread(worker)
             {
-                Task.Factory.StartNew(() =>
-                {
-                    voteHandler(guid, request);
-                }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler);
-            });*/
-               
-            m_AppendEntriesSubscription = m_Transport.Subscribe(Id, appendEntriesHandler);
+                Priority=ThreadPriority.AboveNormal
+            };
+          
+            m_Subscriptions = new[]
+            {
+                subscribe<RequestVoteRequest>(voteRequestHandler),
+                subscribe<RequestVoteResponse>(voteResponseHandler),
+                subscribe<AppendEntriesRequest<TCommand>>(appendEntriesHandler),
+                subscribe<AppendEntriesResponse>(appendEntriesResponseHandler)
+            };
+
             m_TimeoutBase = Configuration.ElectionTimeout;
+        }
+
+        Stopwatch sw =Stopwatch.StartNew();
+        private IDisposable subscribe<T>(Action<T> handler)
+        {
+            
+            return m_Transport.Subscribe<T>(
+                Id,
+                message =>
+                {
+                   
+                        // m_Log.AppendLine(string.Format("{0}\t{1}", sw.ElapsedMilliseconds, m_Scheduler.Count));
+                        //   Console.WriteLine("!!! " + m_Scheduler.Count);
+                        Task.Factory.StartNew(() =>
+                        {
+                            lock (m_SyncRoot)
+                            {
+                                handler(message);
+                            }
+                        }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler);
+                    
+                });
         }
 
         public void Start()
         {
             SwitchToFollower(null);
             m_WrokerThread.Start();
+
         }
 
-        public void Apply(TCommand command)
-        {
-            //TODO: proxy to leader
-        }
-   
         private void worker(object obj)
         {
-            int res;
+            Thread.CurrentThread.Name = Id.ToString();
+            int res=-1;
 
-            while ((res = WaitHandle.WaitAny(new WaitHandle[] { m_Stop, m_Reset },  m_TimeoutBase)) != 0)
+            while (res != 0)
             {
+                var timeoutBase = m_TimeoutBase;
+                res = WaitHandle.WaitAny(new WaitHandle[] {m_Stop, m_Reset}, timeoutBase);
+                //In case if there was delay in switching context to the thread and timeout was reached in spite of reset event was set
+                res = m_Reset.WaitOne(0) ? 1 : res;
+
                 if (res == WaitHandle.WaitTimeout)
+                {
+                    Log("Timeout reached ({0})", timeoutBase);
                     timeout();
+                }
+                else if(res==1)
+                {
+                    Log("Timeout reset");
+                }
+                m_Reset.Reset();
             }
         }
 
-//        [MethodImpl(MethodImplOptions.Synchronized)]
         private void timeout()
         {
-            m_State.Timeout();
-        }
-
-        public void ResetTimeout(double? k=null)
-        {
-            if (k.HasValue)
+            lock (m_SyncRoot)
             {
-                m_TimeoutBase = (int) Math.Round(Configuration.ElectionTimeout*k.Value);
-                return;
+                m_State.Timeout();
             }
-
-
-            //random T , 2T
-            var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
-            int rnd = rndNum.Next(0, Configuration.ElectionTimeout);
-            m_TimeoutBase = rnd + Configuration.ElectionTimeout;
-                
-            m_Reset.Set();
-
         }
 
-
-        public long IncrementTerm()
-        {
-            //TODO: thread safety
-            PersistentState.CurrentTerm = PersistentState.CurrentTerm + 1;
-            return  PersistentState.CurrentTerm;
-        }
 
         public void SwitchToCandidate()
         {
@@ -148,7 +163,7 @@ namespace Inceptum.Raft
         public void SwitchToLeader()
         {
             LeaderId = Id;
-            switchTo(new Leader<TCommand>(this) );
+            switchTo(new Leader<TCommand>(this));
         }
 
         public void SwitchToFollower(Guid? leaderId)
@@ -164,61 +179,10 @@ namespace Inceptum.Raft
         }
 
 
-     
-  //      [MethodImpl(MethodImplOptions.Synchronized)]
-        private AppendEntriesResponse appendEntriesHandler(Guid nodeId, AppendEntriesRequest<TCommand> request)
-        {
-            ResetTimeout();
-
-            if (request.Term > PersistentState.CurrentTerm)
-            {
-                Log("Got newer term from leader {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
-                PersistentState.CurrentTerm = request.Term;
-            }
-            if (request.Term >= PersistentState.CurrentTerm && (State!=NodeState.Follower||LeaderId!=request.LeaderId))
-            {
-                    SwitchToFollower(request.LeaderId);
-            }
-   
-            ResetTimeout();
-          
-            return new AppendEntriesResponse
-            {
-                Success = m_State.AppendEntries(request),
-                Term = PersistentState.CurrentTerm,
-                NodeId = this.Id
-            };
-        }
-
- //       [MethodImpl(MethodImplOptions.Synchronized)]
-        private RequestVoteResponse voteHandler(Guid nodeId, RequestVoteRequest request)
-        {
-            if (request.Term > PersistentState.CurrentTerm)
-            {
-                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm,request.Term,  request.CandidateId);
-                PersistentState.CurrentTerm = request.Term;
-                SwitchToFollower(null);
-            }
-
-            var granted = m_State.RequestVote(request);
-            if (granted)
-            {
-                PersistentState.VotedFor = request.CandidateId;
-                ResetTimeout();
-
-            }
-            return new RequestVoteResponse
-            {
-                Term = PersistentState.CurrentTerm,
-                VoteGranted = granted
-            };
-        }
-
         public void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
         {
-            m_Transport.Send(Id,node, request, response => m_State.ProcessAppendEntriesResponse(node, response));
+            m_Transport.Send(node, request);
         }
-
 
         public void RequestVotes()
         {
@@ -232,25 +196,14 @@ namespace Inceptum.Raft
 
             foreach (var node in Configuration.KnownNodes)
             {
-                var nodeId = node;
-                m_Transport.Send(this.Id,node, request, response => m_State.ProcessVote(nodeId, response));
+                m_Transport.Send(node, request);
             }
-        }
-
-
-
-        public void Dispose()
-        {
-            m_AppendEntriesSubscription.Dispose();
-            m_VoteSubscription.Dispose();
-            m_Stop.Set();
-            m_WrokerThread.Join();
         }
 
         public void Commit(long leaderCommit)
         {
-            Log("Got HB from leader:{0}",LeaderId);
-            for (int i = CommitIndex+1; i <=Math.Min(leaderCommit,PersistentState.Log.Count-1); i++)
+            Log("Got HB from leader:{0}", LeaderId);
+            for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
                 //TODO: actual commit logic
                 Console.WriteLine("APPLY: " + PersistentState.Log[i].Command);
@@ -259,10 +212,101 @@ namespace Inceptum.Raft
             }
         }
 
-
-        public void Log(string format,params object[] args)
+        public long IncrementTerm()
         {
-             m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+            //TODO: thread safety
+            PersistentState.CurrentTerm = PersistentState.CurrentTerm + 1;
+            return PersistentState.CurrentTerm;
+        }
+
+        public void ResetTimeout()
+        {
+            m_TimeoutBase = m_State.GetTimeout(Configuration.ElectionTimeout);
+            Log("timeout reset for {0}",m_TimeoutBase);
+            m_Reset.Set();
+        }
+
+        public void Apply(TCommand command)
+        {
+            //TODO: proxy to leader
+        }
+
+        #region Message Handlers
+
+        private void appendEntriesHandler(AppendEntriesRequest<TCommand> request)
+        {
+            ResetTimeout();
+
+            if (request.Term > PersistentState.CurrentTerm)
+            {
+                Log("Got newer term from leader {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
+                PersistentState.CurrentTerm = request.Term;
+            }
+            if (request.Term >= PersistentState.CurrentTerm && (State != NodeState.Follower || LeaderId != request.LeaderId))
+            {
+                SwitchToFollower(request.LeaderId);
+            }
+
+            ResetTimeout();
+            m_Transport.Send(request.LeaderId, new AppendEntriesResponse
+            {
+                Success = m_State.AppendEntries(request),
+                Term = PersistentState.CurrentTerm,
+                NodeId = Id
+            });
+        }
+
+        private void voteRequestHandler(RequestVoteRequest request)
+        {
+            if (request.Term > PersistentState.CurrentTerm)
+            {
+                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.CandidateId);
+                PersistentState.CurrentTerm = request.Term;
+                SwitchToFollower(null);
+            }
+
+            var granted = m_State.RequestVote(request);
+            if (granted)
+            {
+                PersistentState.VotedFor = request.CandidateId;
+                ResetTimeout();
+            }
+
+            m_Transport.Send(request.CandidateId,
+                new RequestVoteResponse
+                {
+                    NodeId = Id,
+                    Term = PersistentState.CurrentTerm,
+                    VoteGranted = granted
+                });
+        }
+
+        void appendEntriesResponseHandler(AppendEntriesResponse response)
+        {
+            m_State.ProcessAppendEntriesResponse(response);
+        }
+        void voteResponseHandler(RequestVoteResponse vote)
+        {
+            m_State.ProcessVote(vote);
+        }
+
+        #endregion
+
+
+        public void Dispose()
+        {
+            foreach (var subscription in m_Subscriptions)
+            {
+                subscription.Dispose();
+            }
+            m_Stop.Set();
+            m_WrokerThread.Join();
+        }
+
+
+        public void Log(string format, params object[] args)
+        {
+        //    m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") +string.Format(" {{{0:00}}}",Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
         }
     }
 }

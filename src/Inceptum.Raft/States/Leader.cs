@@ -43,9 +43,14 @@ namespace Inceptum.Raft.States
                 MatchIndex[node] = 0;
                 LastSentIndex[node] = 0;
             }
-            Node.ResetTimeout(.5);
+            Node.ResetTimeout();
             Timeout();
             base.Enter();
+        }
+
+        public override int GetTimeout(int electionTimeout)
+        {
+            return (int)Math.Round(1.0*electionTimeout /3);
         }
 
         public override void Timeout()
@@ -82,8 +87,9 @@ namespace Inceptum.Raft.States
             return false;
         }
 
-        public override void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response)
+        public override void ProcessAppendEntriesResponse( AppendEntriesResponse response)
         {
+            var node = response.NodeId;
             //TODO: If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4)
             if (response.Success)
             {

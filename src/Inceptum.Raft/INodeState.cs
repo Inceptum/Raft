@@ -10,8 +10,9 @@ namespace Inceptum.Raft
         void Enter();
         void Timeout();
         bool RequestVote(RequestVoteRequest request);
-        void ProcessVote(Guid node,RequestVoteResponse vote);
+        void ProcessVote(RequestVoteResponse vote);
         bool AppendEntries(AppendEntriesRequest<TCommand> request);
-        void ProcessAppendEntriesResponse(Guid node, AppendEntriesResponse response);
+        void ProcessAppendEntriesResponse(AppendEntriesResponse response);
+        int GetTimeout(int electionTimeout);
     }
 }

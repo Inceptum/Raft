@@ -27,66 +27,19 @@ namespace Inceptum.Raft
 
     public class InMemoryTransport<TCommand> : ITransport<TCommand>
     {
-        Dictionary<Guid, LimitedConcurrencyLevelTaskScheduler> m_Schedulers = new Dictionary<Guid, LimitedConcurrencyLevelTaskScheduler>();
-        readonly Dictionary<Guid, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse>> m_AppendEntriesSubscriptions = new Dictionary<Guid, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse>>();
-        readonly Dictionary<Guid, Func<Guid, RequestVoteRequest, RequestVoteResponse>> m_RequestVoteSubscriptions = new Dictionary<Guid, Func<Guid, RequestVoteRequest, RequestVoteResponse>>();
+        readonly Dictionary<Tuple<Guid,Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<Guid, Type>, Action<object>>();
 
-        public InMemoryTransport(params Guid[] ids)
+        public void Send<T>(Guid to, T message)
         {
-            foreach (var guid in ids)
-            {
-                getScheduler(guid);
-            }
+            var key = Tuple.Create(to, typeof(T));
+            m_Subscriptions[key](message);
         }
 
-        public void Send(Guid from, Guid to, AppendEntriesRequest<TCommand> request, Action<AppendEntriesResponse> callback)
+        public IDisposable Subscribe<T>(Guid subscriberId, Action<T> handler)
         {
-            Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> handler;
-            if (m_AppendEntriesSubscriptions.TryGetValue(to, out handler))
-            {
-                Task.Factory.StartNew(() =>
-                {
-                    var response = handler(to, request);
-                    Task.Factory.StartNew(() => callback(response), CancellationToken.None, TaskCreationOptions.None, getScheduler(from));
-                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(to));
-            }
-        }
-
-        public void Send(Guid from, Guid to, RequestVoteRequest request, Action<RequestVoteResponse> callback)
-        {
-            Func<Guid, RequestVoteRequest, RequestVoteResponse> handler;
-            if (m_RequestVoteSubscriptions.TryGetValue(to, out handler))
-            {
-                Task.Factory.StartNew(() =>
-                {
-                    var response = handler(to, request);
-                    Task.Factory.StartNew(() => callback(response), CancellationToken.None, TaskCreationOptions.None, getScheduler(from));
-                }, CancellationToken.None, TaskCreationOptions.None, getScheduler(to));
-            }
-        }
-
-        private TaskScheduler getScheduler(Guid id)
-        {
-            LimitedConcurrencyLevelTaskScheduler s;
-            if (!m_Schedulers.TryGetValue(id, out s))
-            {
-                s= new LimitedConcurrencyLevelTaskScheduler(1);
-                m_Schedulers[id] = s;
-            }
-            return s;
-        }
-
-        public IDisposable Subscribe(Guid id, Func<Guid, AppendEntriesRequest<TCommand>, AppendEntriesResponse> appendEntries)
-        {
-            m_AppendEntriesSubscriptions[id] = appendEntries;
-            return ActionDisposable.Create(()=>m_AppendEntriesSubscriptions.Remove(id));
-        }
-
-        public IDisposable Subscribe(Guid id, Func<Guid, RequestVoteRequest, RequestVoteResponse> appendEntries)
-        {
-            m_RequestVoteSubscriptions[id] = appendEntries;
-            return ActionDisposable.Create(() => m_RequestVoteSubscriptions.Remove(id));
-
+            var key = Tuple.Create(subscriberId, typeof(T));
+            m_Subscriptions.Add(key, m => handler((T) m));
+            return ActionDisposable.Create(() => m_Subscriptions.Remove(key));
         }
     }
 }

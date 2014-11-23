@@ -22,5 +22,13 @@ namespace Inceptum.Raft.Rpc
         ///   <c>true</c> if candidate has received teh vote; otherwise, <c>false</c>.
         /// </value>
         public bool VoteGranted { get; set; }
+
+        /// <summary>
+        /// Gets or sets the node identifier.
+        /// </summary>
+        /// <value>
+        /// The node identifier.
+        /// </value>
+        public Guid NodeId { get; set; }
     }
 }
