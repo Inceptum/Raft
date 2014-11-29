@@ -75,19 +75,19 @@ namespace Inceptum.Raft.States
         }
         //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
 
-        public override bool RequestVote(RequestVoteRequest request)
+        public override bool Handle(RequestVoteRequest request)
         {
             //Since state is not sitched to follower, term is older or same - decline
             return false;
         }
 
-        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
             //Since state is not sitched to follower, requester term is older or same - decline
             return false;
         }
 
-        public override void ProcessAppendEntriesResponse( AppendEntriesResponse response)
+        public override void Handle( AppendEntriesResponse response)
         {
             var node = response.NodeId;
             //TODO: If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4)

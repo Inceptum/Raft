@@ -24,7 +24,7 @@ namespace Inceptum.Raft.States
             Node.SwitchToCandidate();
         }
 
-        public override bool RequestVote(RequestVoteRequest request)
+        public override bool Handle(RequestVoteRequest request)
         {
             //Reply false if term < currentTerm
             if (request.Term < Node.PersistentState.CurrentTerm )
@@ -36,7 +36,7 @@ namespace Inceptum.Raft.States
                 Node.PersistentState.IsLogOlderOrEqual(request.LastLogIndex, request.LastLogTerm);
         }
 
-        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
 
             //Reply false if term < currentTerm (§5.1)

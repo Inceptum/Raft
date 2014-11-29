@@ -21,16 +21,16 @@ namespace Inceptum.Raft.States
             EnterTime = DateTime.Now;
         }
         public abstract void Timeout();
-        public abstract bool RequestVote(RequestVoteRequest request);
+        public abstract bool Handle(RequestVoteRequest request);
 
-        public virtual void ProcessVote( RequestVoteResponse vote)
+        public virtual void Handle( RequestVoteResponse vote)
         {
             Node.Log("Ignoring RequestVoteResponse since node is not a candidate");
             
         }
-        public abstract bool AppendEntries(AppendEntriesRequest<TCommand> request);
+        public abstract bool Handle(AppendEntriesRequest<TCommand> request);
 
-        public virtual void ProcessAppendEntriesResponse( AppendEntriesResponse response)
+        public virtual void Handle( AppendEntriesResponse response)
         {
             Node.Log("Ignoring AppendEntriesResponse since node is not a leader");
         }
@@ -41,9 +41,6 @@ namespace Inceptum.Raft.States
             //random T , 2T
             var buf = Guid.NewGuid().ToByteArray();
             var rnd = BitConverter.ToInt32(buf, 4) % electionTimeout;
-
-          /*  var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
-            int rnd = rndNum.Next(0, electionTimeout);*/
             return rnd + electionTimeout;
         }
     }

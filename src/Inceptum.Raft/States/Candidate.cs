@@ -29,7 +29,7 @@ namespace Inceptum.Raft.States
             Node.Log("Starting Election");
             m_Votes = new Dictionary<Guid, RequestVoteResponse>();
             //vote for itself
-            ProcessVote(new RequestVoteResponse
+            Handle(new RequestVoteResponse
             {
                 NodeId = Node.Id,
                 Term = Node.IncrementTerm(),
@@ -45,13 +45,13 @@ namespace Inceptum.Raft.States
             startElection();
         }
 
-        public override bool RequestVote(RequestVoteRequest request)
+        public override bool Handle(RequestVoteRequest request)
         {
             //term in request is not newer than our (otherwise state should have been already changed to follower)
             return false;
         }
 
-        public override void ProcessVote(RequestVoteResponse vote)
+        public override void Handle(RequestVoteResponse vote)
         {
             Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
 
@@ -61,7 +61,7 @@ namespace Inceptum.Raft.States
 
         }
 
-        public override bool AppendEntries(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
             //term in request is not newer than our (otherwise state should have been already changed to follower)
             return false;

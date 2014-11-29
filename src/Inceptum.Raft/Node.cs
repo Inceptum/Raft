@@ -14,37 +14,43 @@ namespace Inceptum.Raft
         Candidate,
         Follower
     }
+
     public class Node<TCommand> : IDisposable
     {
-        INodeState<TCommand> m_State;
-        readonly Thread m_TimeoutHandlingThread;
-        readonly AutoResetEvent m_Reset = new AutoResetEvent(false);
-        readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
-        private int m_TimeoutBase;
-        private readonly ITransport m_Transport;
-        private readonly IDisposable[] m_Subscriptions;
         public static readonly StringBuilder m_Log = new StringBuilder();
+        private readonly AutoResetEvent m_Reset = new AutoResetEvent(false);
+        private readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
+        private readonly SingleThreadTaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal);
+        private readonly IDisposable[] m_Subscriptions;
+        private readonly object m_SyncRoot = new object();
+        private readonly Thread m_TimeoutHandlingThread;
+        private readonly ITransport m_Transport;
+        private INodeState<TCommand> m_State;
+        private int m_TimeoutBase;
+
         public NodeConfiguration Configuration { get; private set; }
 
         /// <summary>
-        /// Gets or sets the state of the persistent.
+        ///     Gets or sets the state of the persistent.
         /// </summary>
         /// <value>
-        /// The state of the persistent.
+        ///     The state of the persistent.
         /// </value>
         internal PersistentState<TCommand> PersistentState { get; private set; }
+
         /// <summary>
-        /// Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)
+        ///     Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)
         /// </summary>
         /// <value>
-        /// The index of the commit.
+        ///     The index of the commit.
         /// </value>
         public int CommitIndex { get; private set; }
+
         /// <summary>
-        /// Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
+        ///     Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
         /// </summary>
         /// <value>
-        /// The last applied  log entry index.
+        ///     The last applied  log entry index.
         /// </value>
         public long LastApplied { get; private set; }
 
@@ -52,15 +58,20 @@ namespace Inceptum.Raft
 
         public Guid Id { get; private set; }
 
-        public NodeState State { get { return m_State.State; } }
-        
-        public long CurrentTerm { get { return PersistentState.CurrentTerm; } }
+        public NodeState State
+        {
+            get { return m_State.State; }
+        }
 
-        public DateTime CurrentStateEnterTime { get { return m_State.EnterTime; } }
+        public long CurrentTerm
+        {
+            get { return PersistentState.CurrentTerm; }
+        }
 
-        private readonly SingleThreadTaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal);
-
-        private readonly object m_SyncRoot=new object();
+        public DateTime CurrentStateEnterTime
+        {
+            get { return m_State.EnterTime; }
+        }
 
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport)
         {
@@ -71,15 +82,15 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread = new Thread(timeoutHandlingLoop)
             {
                 //Due to timeout logic it is significant to get execution context precisely
-                Priority=ThreadPriority.AboveNormal
+                Priority = ThreadPriority.AboveNormal
             };
-          
+
             m_Subscriptions = new[]
             {
-                subscribe<RequestVoteRequest>(voteRequestHandler),
-                subscribe<RequestVoteResponse>(voteResponseHandler),
-                subscribe<AppendEntriesRequest<TCommand>>(appendEntriesHandler),
-                subscribe<AppendEntriesResponse>(appendEntriesResponseHandler)
+                subscribe<RequestVoteRequest>(Handle),
+                subscribe<RequestVoteResponse>(Handle),
+                subscribe<AppendEntriesRequest<TCommand>>(Handle),
+                subscribe<AppendEntriesResponse>(Handle)
             };
 
             m_TimeoutBase = Configuration.ElectionTimeout;
@@ -87,7 +98,6 @@ namespace Inceptum.Raft
 
         private IDisposable subscribe<T>(Action<T> handler)
         {
-            
             return m_Transport.Subscribe<T>(
                 Id,
                 message => Task.Factory.StartNew(() =>
@@ -101,19 +111,23 @@ namespace Inceptum.Raft
 
         public void Start()
         {
-            switchToFollower(null);
+            SwitchToFollower(null);
             m_TimeoutHandlingThread.Start();
+        }
 
+        public void Apply(TCommand command)
+        {
+            //TODO: proxy to leader
         }
 
         private void timeoutHandlingLoop(object obj)
         {
             Thread.CurrentThread.Name = Id.ToString();
-            int res=-1;
+            int res = -1;
 
             while (res != 0)
             {
-                var timeoutBase = m_TimeoutBase;
+                int timeoutBase = m_TimeoutBase;
                 res = WaitHandle.WaitAny(new WaitHandle[] {m_Stop, m_Reset}, timeoutBase);
                 //If CPU is loaded it is possible that after m_Reset is set, context would be swithed after timout has ended.
                 res = m_Reset.WaitOne(0) ? 1 : res;
@@ -121,9 +135,12 @@ namespace Inceptum.Raft
                 if (res == WaitHandle.WaitTimeout)
                 {
                     Log("Timeout reached ({0})", timeoutBase);
-                    timeout();
+                    lock (m_SyncRoot)
+                    {
+                        m_State.Timeout();
+                    }
                 }
-                else if(res==1)
+                else if (res == 1)
                 {
                     Log("Timeout reset");
                 }
@@ -131,29 +148,26 @@ namespace Inceptum.Raft
             }
         }
 
-        private void timeout()
+        internal void ResetTimeout()
         {
-            lock (m_SyncRoot)
-            {
-                m_State.Timeout();
-            }
+            m_TimeoutBase = m_State.GetTimeout(Configuration.ElectionTimeout);
+            Log("timeout reset for {0}", m_TimeoutBase);
+            m_Reset.Set();
         }
 
-
-        public void SwitchToCandidate()
+        internal void SwitchToCandidate()
         {
             LeaderId = null;
             switchTo(new Candidate<TCommand>(this));
-
         }
 
-        public void SwitchToLeader()
+        internal void SwitchToLeader()
         {
             LeaderId = Id;
             switchTo(new Leader<TCommand>(this));
         }
 
-        private void switchToFollower(Guid? leaderId)
+        internal void SwitchToFollower(Guid? leaderId)
         {
             LeaderId = leaderId;
             switchTo(new Follower<TCommand>(this));
@@ -166,12 +180,12 @@ namespace Inceptum.Raft
         }
 
 
-        public void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
+        internal void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
         {
-            m_Transport.Send(Id,node, request);
+            m_Transport.Send(Id, node, request);
         }
 
-        public void RequestVotes()
+        internal void RequestVotes()
         {
             var request = new RequestVoteRequest
             {
@@ -187,10 +201,10 @@ namespace Inceptum.Raft
             }
         }
 
-        public void Commit(long leaderCommit)
+        internal void Commit(long leaderCommit)
         {
             Log("Got HB from leader:{0}", LeaderId);
-            for (var i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
+            for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
                 //TODO: actual commit logic
                 Console.WriteLine("APPLY: " + PersistentState.Log[i].Command);
@@ -205,21 +219,9 @@ namespace Inceptum.Raft
             return PersistentState.CurrentTerm;
         }
 
-        public void ResetTimeout()
-        {
-            m_TimeoutBase = m_State.GetTimeout(Configuration.ElectionTimeout);
-            Log("timeout reset for {0}",m_TimeoutBase);
-            m_Reset.Set();
-        }
-
-        public void Apply(TCommand command)
-        {
-            //TODO: proxy to leader
-        }
-
         #region Message Handlers
 
-        private void appendEntriesHandler(AppendEntriesRequest<TCommand> request)
+        internal void Handle(AppendEntriesRequest<TCommand> request)
         {
             ResetTimeout();
 
@@ -230,40 +232,40 @@ namespace Inceptum.Raft
             }
             if (request.Term >= PersistentState.CurrentTerm && (State != NodeState.Follower || LeaderId != request.LeaderId))
             {
-                switchToFollower(request.LeaderId);
+                SwitchToFollower(request.LeaderId);
             }
 
             m_Transport.Send(Id, request.LeaderId, new AppendEntriesResponse
             {
-                Success = m_State.AppendEntries(request),
+                Success = m_State.Handle(request),
                 Term = PersistentState.CurrentTerm,
                 NodeId = Id
             });
         }
 
-        void appendEntriesResponseHandler(AppendEntriesResponse response)
+        internal void Handle(AppendEntriesResponse response)
         {
             if (response.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, response.Term, response.NodeId);
                 PersistentState.CurrentTerm = response.Term;
-                switchToFollower(null);
+                SwitchToFollower(null);
             }
 
 
-            m_State.ProcessAppendEntriesResponse(response);
+            m_State.Handle(response);
         }
 
-        private void voteRequestHandler(RequestVoteRequest request)
+        internal void Handle(RequestVoteRequest request)
         {
             if (request.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.CandidateId);
                 PersistentState.CurrentTerm = request.Term;
-                switchToFollower(null);
+                SwitchToFollower(null);
             }
 
-            var granted = m_State.RequestVote(request);
+            bool granted = m_State.Handle(request);
             if (granted)
             {
                 PersistentState.VotedFor = request.CandidateId;
@@ -279,24 +281,23 @@ namespace Inceptum.Raft
                 });
         }
 
-        void voteResponseHandler(RequestVoteResponse vote)
+        internal void Handle(RequestVoteResponse vote)
         {
             if (vote.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, vote.Term, vote.NodeId);
                 PersistentState.CurrentTerm = vote.Term;
-                switchToFollower(null);
+                SwitchToFollower(null);
             }
 
-            m_State.ProcessVote(vote);
+            m_State.Handle(vote);
         }
 
         #endregion
 
-
         public void Dispose()
         {
-            foreach (var subscription in m_Subscriptions)
+            foreach (IDisposable subscription in m_Subscriptions)
             {
                 subscription.Dispose();
             }
@@ -305,10 +306,10 @@ namespace Inceptum.Raft
             m_Scheduler.Wait();
         }
 
-
         public void Log(string format, params object[] args)
         {
-             m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") +string.Format(" {{{0:00}}}",Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" + PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+            m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + string.Format(" {{{0:00}}}", Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" +
+                             PersistentState.CurrentTerm + "]:" + string.Format(format, args));
         }
     }
 }
