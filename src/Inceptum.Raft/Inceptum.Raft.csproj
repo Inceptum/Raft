@@ -39,8 +39,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ActionDisposable.cs" />
     <Compile Include="SingleThreadTaskScheduler.cs" />
-    <Compile Include="LimitedConcurrencyLevelTaskScheduler.cs" />
     <Compile Include="InMemoryTransport.cs" />
     <Compile Include="ITransport.cs" />
     <Compile Include="NodeConfiguration.cs" />

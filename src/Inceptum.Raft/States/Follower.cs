@@ -5,13 +5,10 @@ namespace Inceptum.Raft.States
 {
     class Follower<TCommand> : NodeState<TCommand>
     {
-
         public Follower(Node<TCommand> node)
             : base(node,NodeState.Follower)
         {
         }
-
-
 
         public override void Enter()
         {

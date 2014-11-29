@@ -33,7 +33,7 @@ namespace TestConsoleApplication
                     Guid.Parse("1DF25C51-29DD-4A00-AD26-0198B09DA036")
                 };
 
-                var inMemoryTransport = new InMemoryTransport<object>();
+                var inMemoryTransport = new InMemoryTransport();
 
                 var nodes = knownNodes.Select(
                     id =>
@@ -74,9 +74,16 @@ namespace TestConsoleApplication
                         Thread.Sleep(500);
                     }
                 },ct);
-
-               
-                Console.ReadLine();
+/*
+               Thread.Sleep(3000);
+                var leaderId = nodes.First().LeaderId.Value;
+                Console.WriteLine("Failing the leader" + leaderId);
+               inMemoryTransport.EmulateConnectivityIssue(leaderId);
+               Thread.Sleep(1000);
+               Console.WriteLine("Restoring ex leader" + leaderId);
+               inMemoryTransport.RestoreConnectivity(leaderId);
+               Thread.Sleep(1000);*/
+               Console.ReadLine();
                 tokenSource2.Cancel();
 
                 {

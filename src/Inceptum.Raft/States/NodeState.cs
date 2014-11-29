@@ -38,12 +38,13 @@ namespace Inceptum.Raft.States
 
         public virtual int GetTimeout(int electionTimeout)
         {
-
             //random T , 2T
-            var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
-            int rnd = rndNum.Next(0, electionTimeout);
-          return rnd + electionTimeout;
+            var buf = Guid.NewGuid().ToByteArray();
+            var rnd = BitConverter.ToInt32(buf, 4) % electionTimeout;
 
+          /*  var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
+            int rnd = rndNum.Next(0, electionTimeout);*/
+            return rnd + electionTimeout;
         }
     }
 }

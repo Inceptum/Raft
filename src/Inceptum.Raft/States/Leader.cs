@@ -14,16 +14,16 @@ namespace Inceptum.Raft.States
         /// <value>
         /// The next indexes.
         /// </value>
-        public Dictionary<Guid,int> NextIndexes { get; private set; }
+        private Dictionary<Guid,int> NextIndexes { get; set; }
         /// <summary>
         /// For each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
         /// </summary>
         /// <value>
         /// The index of the match.
         /// </value>
-        public Dictionary<Guid, int> MatchIndex { get; private set; }
+        private Dictionary<Guid, int> MatchIndex { get; set; }
 
-        public Dictionary<Guid, int> LastSentIndex { get; private set; }
+        private Dictionary<Guid, int> LastSentIndex { get; set; }
 
         public Leader(Node<TCommand> node)
             : base(node,NodeState.Leader)

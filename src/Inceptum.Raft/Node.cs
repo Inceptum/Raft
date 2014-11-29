@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,13 +17,12 @@ namespace Inceptum.Raft
     public class Node<TCommand> : IDisposable
     {
         INodeState<TCommand> m_State;
-        readonly Thread m_WrokerThread;
+        readonly Thread m_TimeoutHandlingThread;
         readonly AutoResetEvent m_Reset = new AutoResetEvent(false);
         readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
         private int m_TimeoutBase;
-        private readonly ITransport<TCommand> m_Transport;
+        private readonly ITransport m_Transport;
         private readonly IDisposable[] m_Subscriptions;
-        readonly Random m_Random = new Random();
         public static readonly StringBuilder m_Log = new StringBuilder();
         public NodeConfiguration Configuration { get; private set; }
 
@@ -57,25 +52,25 @@ namespace Inceptum.Raft
 
         public Guid Id { get; private set; }
 
-        public NodeState State
-        {
-            get { return m_State.State; }
-        }
+        public NodeState State { get { return m_State.State; } }
+        
         public long CurrentTerm { get { return PersistentState.CurrentTerm; } }
+
         public DateTime CurrentStateEnterTime { get { return m_State.EnterTime; } }
 
-        //private readonly LimitedConcurrencyLevelTaskScheduler m_Scheduler = new LimitedConcurrencyLevelTaskScheduler(1);
-        private readonly TaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ApartmentState.MTA);
+        private readonly SingleThreadTaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal);
 
-        private object m_SyncRoot=new object();
-        public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport<TCommand> transport)
+        private readonly object m_SyncRoot=new object();
+
+        public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport)
         {
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
             PersistentState = persistentState;
-            m_WrokerThread = new Thread(worker)
+            m_TimeoutHandlingThread = new Thread(timeoutHandlingLoop)
             {
+                //Due to timeout logic it is significant to get execution context precisely
                 Priority=ThreadPriority.AboveNormal
             };
           
@@ -90,36 +85,28 @@ namespace Inceptum.Raft
             m_TimeoutBase = Configuration.ElectionTimeout;
         }
 
-        Stopwatch sw =Stopwatch.StartNew();
         private IDisposable subscribe<T>(Action<T> handler)
         {
             
             return m_Transport.Subscribe<T>(
                 Id,
-                message =>
+                message => Task.Factory.StartNew(() =>
                 {
-                   
-                        // m_Log.AppendLine(string.Format("{0}\t{1}", sw.ElapsedMilliseconds, m_Scheduler.Count));
-                        //   Console.WriteLine("!!! " + m_Scheduler.Count);
-                        Task.Factory.StartNew(() =>
-                        {
-                            lock (m_SyncRoot)
-                            {
-                                handler(message);
-                            }
-                        }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler);
-                    
-                });
+                    lock (m_SyncRoot)
+                    {
+                        handler(message);
+                    }
+                }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler));
         }
 
         public void Start()
         {
-            SwitchToFollower(null);
-            m_WrokerThread.Start();
+            switchToFollower(null);
+            m_TimeoutHandlingThread.Start();
 
         }
 
-        private void worker(object obj)
+        private void timeoutHandlingLoop(object obj)
         {
             Thread.CurrentThread.Name = Id.ToString();
             int res=-1;
@@ -166,7 +153,7 @@ namespace Inceptum.Raft
             switchTo(new Leader<TCommand>(this));
         }
 
-        public void SwitchToFollower(Guid? leaderId)
+        private void switchToFollower(Guid? leaderId)
         {
             LeaderId = leaderId;
             switchTo(new Follower<TCommand>(this));
@@ -181,7 +168,7 @@ namespace Inceptum.Raft
 
         public void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
         {
-            m_Transport.Send(node, request);
+            m_Transport.Send(Id,node, request);
         }
 
         public void RequestVotes()
@@ -196,14 +183,14 @@ namespace Inceptum.Raft
 
             foreach (var node in Configuration.KnownNodes)
             {
-                m_Transport.Send(node, request);
+                m_Transport.Send(Id, node, request);
             }
         }
 
         public void Commit(long leaderCommit)
         {
             Log("Got HB from leader:{0}", LeaderId);
-            for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
+            for (var i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
                 //TODO: actual commit logic
                 Console.WriteLine("APPLY: " + PersistentState.Log[i].Command);
@@ -212,9 +199,8 @@ namespace Inceptum.Raft
             }
         }
 
-        public long IncrementTerm()
+        internal long IncrementTerm()
         {
-            //TODO: thread safety
             PersistentState.CurrentTerm = PersistentState.CurrentTerm + 1;
             return PersistentState.CurrentTerm;
         }
@@ -244,15 +230,28 @@ namespace Inceptum.Raft
             }
             if (request.Term >= PersistentState.CurrentTerm && (State != NodeState.Follower || LeaderId != request.LeaderId))
             {
-                SwitchToFollower(request.LeaderId);
+                switchToFollower(request.LeaderId);
             }
 
-            m_Transport.Send(request.LeaderId, new AppendEntriesResponse
+            m_Transport.Send(Id, request.LeaderId, new AppendEntriesResponse
             {
                 Success = m_State.AppendEntries(request),
                 Term = PersistentState.CurrentTerm,
                 NodeId = Id
             });
+        }
+
+        void appendEntriesResponseHandler(AppendEntriesResponse response)
+        {
+            if (response.Term > PersistentState.CurrentTerm)
+            {
+                Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, response.Term, response.NodeId);
+                PersistentState.CurrentTerm = response.Term;
+                switchToFollower(null);
+            }
+
+
+            m_State.ProcessAppendEntriesResponse(response);
         }
 
         private void voteRequestHandler(RequestVoteRequest request)
@@ -261,7 +260,7 @@ namespace Inceptum.Raft
             {
                 Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.CandidateId);
                 PersistentState.CurrentTerm = request.Term;
-                SwitchToFollower(null);
+                switchToFollower(null);
             }
 
             var granted = m_State.RequestVote(request);
@@ -271,7 +270,7 @@ namespace Inceptum.Raft
                 ResetTimeout();
             }
 
-            m_Transport.Send(request.CandidateId,
+            m_Transport.Send(Id, request.CandidateId,
                 new RequestVoteResponse
                 {
                     NodeId = Id,
@@ -280,12 +279,15 @@ namespace Inceptum.Raft
                 });
         }
 
-        void appendEntriesResponseHandler(AppendEntriesResponse response)
-        {
-            m_State.ProcessAppendEntriesResponse(response);
-        }
         void voteResponseHandler(RequestVoteResponse vote)
         {
+            if (vote.Term > PersistentState.CurrentTerm)
+            {
+                Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, vote.Term, vote.NodeId);
+                PersistentState.CurrentTerm = vote.Term;
+                switchToFollower(null);
+            }
+
             m_State.ProcessVote(vote);
         }
 
@@ -299,7 +301,8 @@ namespace Inceptum.Raft
                 subscription.Dispose();
             }
             m_Stop.Set();
-            m_WrokerThread.Join();
+            m_TimeoutHandlingThread.Join();
+            m_Scheduler.Wait();
         }
 
 

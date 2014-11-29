@@ -1,45 +1,51 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft
 {
-    class ActionDisposable:IDisposable
-    {
-        private readonly Action m_Action;
-
-        private ActionDisposable(Action action)
-        {
-            m_Action = action;
-        }
-
-        public static IDisposable Create(Action action)
-        {
-            return new ActionDisposable(action);
-        }
-        public void Dispose()
-        {
-            m_Action();
-        }
-    }
-
-    public class InMemoryTransport<TCommand> : ITransport<TCommand>
+    public class InMemoryTransport : ITransport 
     {
         readonly Dictionary<Tuple<Guid,Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<Guid, Type>, Action<object>>();
-
-        public void Send<T>(Guid to, T message)
+        readonly List<Guid> m_FailedNodes=new List<Guid>();
+        public void EmulateConnectivityIssue(Guid nodeId)
         {
+            m_FailedNodes.Add(nodeId);
+        }
+        public void RestoreConnectivity(Guid nodeId)
+        {
+            m_FailedNodes.Remove(nodeId);
+        }
+
+
+        public void Send<T>(Guid from, Guid to, T message)
+        {
+            if(m_FailedNodes.Contains(to))
+                return;
+            if (m_FailedNodes.Contains(from))
+                return;
             var key = Tuple.Create(to, typeof(T));
-            m_Subscriptions[key](message);
+            lock (m_Subscriptions)
+            {
+                Action<object> handler;
+                if(m_Subscriptions.TryGetValue(key, out handler))
+                    handler(message);
+            }
         }
 
         public IDisposable Subscribe<T>(Guid subscriberId, Action<T> handler)
         {
             var key = Tuple.Create(subscriberId, typeof(T));
-            m_Subscriptions.Add(key, m => handler((T) m));
-            return ActionDisposable.Create(() => m_Subscriptions.Remove(key));
+            lock (m_Subscriptions)
+            {
+                m_Subscriptions.Add(key, m => handler((T) m));
+            }
+            return ActionDisposable.Create(() =>
+            {
+                lock (m_Subscriptions)
+                {
+                    m_Subscriptions.Remove(key);
+                }
+            });
         }
     }
 }

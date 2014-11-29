@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Inceptum.Raft
 {
     /// <summary>
-    ///     Represents a <see cref="TaskScheduler"/> which executes code on a dedicated, single thread whose <see cref="ApartmentState"/> can be configured.
+    ///     Represents a <see cref="TaskScheduler"/> which executes code on a dedicated, single thread.
     /// </summary>
     /// <remarks>
     ///     You can use this class if you want to perform operations on a non thread-safe library from a multi-threaded environment.
@@ -15,66 +15,26 @@ namespace Inceptum.Raft
     public sealed class SingleThreadTaskScheduler
         : TaskScheduler, IDisposable
     {
-        private readonly Thread _thread;
-        private readonly CancellationTokenSource _cancellationToken;
-        private readonly BlockingCollection<Task> _tasks;
-        private readonly Action _initAction;
+        private readonly Thread m_Thread;
+        private readonly CancellationTokenSource m_CancellationToken;
+        private readonly BlockingCollection<Task> m_Tasks;
+
 
         /// <summary>
-        ///     The <see cref="System.Threading.ApartmentState"/> of the <see cref="Thread"/> this <see cref="SingleThreadTaskScheduler"/> uses to execute its work.
+        /// Initializes a new instance of the <see cref="SingleThreadTaskScheduler" /> passsing an initialization action, optionally setting an <see cref="System.Threading.ApartmentState" />.
         /// </summary>
-        public ApartmentState ApartmentState { get; private set; }
-
-        /// <summary>
-        ///     Indicates the maximum concurrency level this <see cref="T:System.Threading.Tasks.TaskScheduler"/> is able to support.
-        /// </summary>
-        /// 
-        /// <returns>
-        ///     Returns <c>1</c>.
-        /// </returns>
-        public override int MaximumConcurrencyLevel
+        /// <param name="threadPriority">The thread priority.</param>
+        public SingleThreadTaskScheduler(ThreadPriority threadPriority)
         {
-            get { return 1; }
-        }
+            m_CancellationToken = new CancellationTokenSource();
+            m_Tasks = new BlockingCollection<Task>();
+            m_Thread = new Thread(threadStart)
+            {
+                IsBackground = true, 
+                Priority = threadPriority
+            };
 
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="SingleThreadTaskScheduler"/>, optionally setting an <see cref="System.Threading.ApartmentState"/>.
-        /// </summary>
-        /// <param name="apartmentState">
-        ///     The <see cref="ApartmentState"/> to use. Defaults to <see cref="System.Threading.ApartmentState.STA"/>
-        /// </param>
-        public SingleThreadTaskScheduler(ApartmentState apartmentState = ApartmentState.STA)
-            : this(null, apartmentState)
-        {
-
-        }
-
-        /// <summary>
-        ///     Initializes a new instance of the <see cref="SingleThreadTaskScheduler"/> passsing an initialization action, optionally setting an <see cref="System.Threading.ApartmentState"/>.
-        /// </summary>
-        /// <param name="initAction">
-        ///     An <see cref="Action"/> to perform in the context of the <see cref="Thread"/> this <see cref="SingleThreadTaskScheduler"/> uses to execute its work after it has been started.
-        /// </param>
-        /// <param name="apartmentState">
-        ///     The <see cref="ApartmentState"/> to use. Defaults to <see cref="System.Threading.ApartmentState.STA"/>
-        /// </param>
-        public SingleThreadTaskScheduler(Action initAction, ApartmentState apartmentState = ApartmentState.STA)
-        {
-            if (apartmentState != ApartmentState.MTA && apartmentState != ApartmentState.STA)
-                throw new ArgumentException("apartementState");
-
-            this.ApartmentState = apartmentState;
-            this._cancellationToken = new CancellationTokenSource();
-            this._tasks = new BlockingCollection<Task>();
-            this._initAction = initAction ?? (() => { });
-
-            this._thread = new Thread(this.ThreadStart);
-            this._thread.IsBackground = true;
-            this._thread.TrySetApartmentState(apartmentState);
-
-            this._thread.Priority=ThreadPriority.AboveNormal;
-
-            this._thread.Start();
+            m_Thread.Start();
         }
 
 
@@ -89,13 +49,12 @@ namespace Inceptum.Raft
         /// </exception>
         public void Wait()
         {
-            if (this._cancellationToken.IsCancellationRequested)
+            if (m_CancellationToken.IsCancellationRequested)
                 throw new TaskSchedulerException("Cannot wait after disposal.");
 
-            this._tasks.CompleteAdding();
-            this._thread.Join();
-
-            this._cancellationToken.Cancel();
+            m_Tasks.CompleteAdding();
+            m_Thread.Join();
+            m_CancellationToken.Cancel();
         }
 
         /// <summary>
@@ -106,60 +65,57 @@ namespace Inceptum.Raft
         /// </remarks>
         public void Dispose()
         {
-            if (this._cancellationToken.IsCancellationRequested)
+            if (m_CancellationToken.IsCancellationRequested)
                 return;
 
-            this._tasks.CompleteAdding();
-            this._cancellationToken.Cancel();
+            m_Tasks.CompleteAdding();
+            m_CancellationToken.Cancel();
         }
 
         protected override void QueueTask(Task task)
         {
-            this.VerifyNotDisposed();
+            verifyNotDisposed();
 
-            this._tasks.Add(task, this._cancellationToken.Token);
+            m_Tasks.Add(task, m_CancellationToken.Token);
         }
 
         protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
         {
-            this.VerifyNotDisposed();
+            verifyNotDisposed();
 
-            if (this._thread != Thread.CurrentThread)
+            if (m_Thread != Thread.CurrentThread)
                 return false;
-            if (this._cancellationToken.Token.IsCancellationRequested)
+            if (m_CancellationToken.Token.IsCancellationRequested)
                 return false;
 
-            this.TryExecuteTask(task);
+            TryExecuteTask(task);
             return true;
         }
 
         protected override IEnumerable<Task> GetScheduledTasks()
         {
-            this.VerifyNotDisposed();
+            verifyNotDisposed();
 
-            return this._tasks.ToArray();
+            return m_Tasks.ToArray();
         }
 
-        private void ThreadStart()
+        private void threadStart()
         {
             try
             {
-                var token = this._cancellationToken.Token;
-
-                this._initAction();
-
-                foreach (var task in this._tasks.GetConsumingEnumerable(token))
-                    this.TryExecuteTask(task);
+                var token = m_CancellationToken.Token;
+                foreach (var task in m_Tasks.GetConsumingEnumerable(token))
+                    TryExecuteTask(task);
             }
             finally
             {
-                this._tasks.Dispose();
+                m_Tasks.Dispose();
             }
         }
 
-        private void VerifyNotDisposed()
+        private void verifyNotDisposed()
         {
-            if (this._cancellationToken.IsCancellationRequested)
+            if (m_CancellationToken.IsCancellationRequested)
                 throw new ObjectDisposedException(typeof(SingleThreadTaskScheduler).Name);
         }
     }

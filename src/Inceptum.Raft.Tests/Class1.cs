@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -49,26 +50,61 @@ namespace Inceptum.Raft.Tests
     {
         private static int counter = 0;
 
-        [Test]
-        //[Repeat(100)]
-        public void GuidTest()
+        [Test, Ignore]
+        public void GuidBasedRandom1Test()
         {
-            List<int> l=new List<int>();
             var sw = Stopwatch.StartNew();
-            for (int i = 0; i < 100000; i++)
+            for (int i = 0; i < 1000000; i++)
             {
-                var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), System.Globalization.NumberStyles.HexNumber));
-                l.Add(rndNum.Next(0, 300));
+                var rndNum = new Random(int.Parse(Guid.NewGuid().ToString().Substring(0, 8), NumberStyles.HexNumber));
+                rndNum.Next(0, 150);
             }
             sw.Stop();
             Console.WriteLine(sw.ElapsedMilliseconds);
             Console.WriteLine(sw.ElapsedMilliseconds*1.0/100000);
+
+        }
+        [Test, Ignore]
+        public void GuidBasedRandom2Test()
+        {
+           
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < 1000000; i++)
+            {
+                var buf = Guid.NewGuid().ToByteArray();
+                var i1 = BitConverter.ToInt32(buf, 4)%150;
+                Console.WriteLine(i1);
+            }
+            sw.Stop();
+            Console.WriteLine(sw.ElapsedMilliseconds);
+            Console.WriteLine(sw.ElapsedMilliseconds*1.0/100000);
+
+        }
+        [Test,Ignore]
+        public void CryptographyBasedRandomTest()
+        {
+            var buf = new byte[4];
+            var rand = new RNGCryptoServiceProvider(new CspParameters());
+            var sw = Stopwatch.StartNew();
+            for (int i = 0; i < 1000000; i++)
+            {
+                rand.GetBytes(buf);     
+                BitConverter.ToInt32(buf, 0);
+            }
+            sw.Stop();
+            rand.Dispose();
+            Console.WriteLine(sw.ElapsedMilliseconds);
+            Console.WriteLine(sw.ElapsedMilliseconds*1.0/100000);
+
+
+
         }
 
         [Test]
-        //[Repeat(100)]
-        public void ConsensusIsReachableWithin10ElectionTimeoutsTest()
+        //[Repeat(50)]
+        public void ConsensusIsReachableWithin5ElectionTimeoutsTest()
         {
+            const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
             var sb=new StringBuilder();
             try
@@ -82,14 +118,12 @@ namespace Inceptum.Raft.Tests
                     Guid.Parse("1DF25C51-29DD-4A00-AD26-0198B09DA036")
                 };
 
-                 var inMemoryTransport = new InMemoryTransport<object>();
+                 var inMemoryTransport = new InMemoryTransport();
 
               //     knownNodes = Enumerable.Range(1, 20).Select(z => Guid.NewGuid()).ToList();
 
                 var nodes = knownNodes.Select(
-                    id =>
-                        new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = 500},
-                            inMemoryTransport))
+                    id => new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = electionTimeout},inMemoryTransport))
                     .ToArray();
 
                 var start = DateTime.Now;
@@ -98,7 +132,8 @@ namespace Inceptum.Raft.Tests
                     node.Start();
                 }
 
-                Thread.Sleep(120000);
+                //Thread.Sleep(electionTimeout*5);
+                Thread.Sleep(15000);
 
                 var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
                 foreach (var node in nodes)
@@ -117,14 +152,13 @@ namespace Inceptum.Raft.Tests
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.LessThan(2), "There are more then one Leader after election");
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Leader), Is.GreaterThan(0), "There is no Leader after election");
                 Assert.That(nodeStates.Count(n => n.State == NodeState.Candidate), Is.EqualTo(0), "There are Candidates  after election");
-         //       Assert.That(nodes.Select(n=>n.CurrentTerm).Distinct().Count(), Is.EqualTo(1), "Tearm is not the same for all nodes");
+                Assert.That(nodes.Select(n=>n.CurrentTerm).Distinct().Count(), Is.EqualTo(1), "Tearm is not the same for all nodes");
                 var term = nodes.Select(n=>n.CurrentTerm).First();
 
-           //     Assert.That(term, Is.LessThan(10), "There are Candidates  after election");
-/*                Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
-*/
+                Assert.That(term, Is.LessThan(10), "There are Candidates  after election");
+                Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
                 
-                Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds.ToString().Replace(".",","), term);
+                //Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds.ToString().Replace(".",","), term);
             }
             catch
             {
@@ -139,13 +173,6 @@ namespace Inceptum.Raft.Tests
 
             finally
             {
-                if(++counter%100==0)
-                    Console.WriteLine(DateTime.Now+" "+counter);
-                         /*       Console.WriteLine(".");
-Console.WriteLine();
-                Console.WriteLine();
-                Console.WriteLine();
-                Console.WriteLine();*/
                 Console.WriteLine(Node<object>.m_Log);
             }
         }

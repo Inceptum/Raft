@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Inceptum.Raft.Rpc;
 
@@ -14,10 +15,8 @@ namespace Inceptum.Raft.States
         {
         }
 
-
         public override void Enter()
         {
-           
             //On conversion to candidate, start election
             startElection();
             Node.Log("I am candidate");
@@ -28,22 +27,16 @@ namespace Inceptum.Raft.States
         {
             Node.ResetTimeout();
             Node.Log("Starting Election");
-            m_Votes = new Dictionary<Guid, RequestVoteResponse>
+            m_Votes = new Dictionary<Guid, RequestVoteResponse>();
+            //vote for itself
+            ProcessVote(new RequestVoteResponse
             {
-                {
-                    Node.Id,
-                    new RequestVoteResponse
-                    {
-                        Term = Node.IncrementTerm(),
-                        VoteGranted = true
-                    }
-                }
-            };
-            //TODO: Crappy code, two places where votedFor is set...
-            Node.PersistentState.VotedFor = Node.Id;
+                NodeId = Node.Id,
+                Term = Node.IncrementTerm(),
+                VoteGranted = true
+            });
 
             Node.RequestVotes();
-            Node.ResetTimeout();
         }
 
         public override void Timeout()
@@ -60,8 +53,8 @@ namespace Inceptum.Raft.States
 
         public override void ProcessVote(RequestVoteResponse vote)
         {
-            if (m_Votes.ContainsKey(vote.NodeId))
-                Console.WriteLine("!!!");
+            Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
+
             m_Votes[vote.NodeId] = vote;
             if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
                 Node.SwitchToLeader();
