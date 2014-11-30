@@ -24,14 +24,7 @@ namespace TestConsoleApplication
             var sb = new StringBuilder();
             try
             {
-                var knownNodes = new List<Guid>
-                {
-                    Guid.Parse("AE34F270-A72B-4D23-9BBE-C660403690E0"),
-                    Guid.Parse("DAA588C4-26DD-451F-865C-5591E78994FB"),
-                    Guid.Parse("27AFDE7B-FD8E-4F8E-BA42-7DA24F8EE2E5"),
-                    Guid.Parse("DEE86807-E9BC-4927-B748-89C8101D826E"),
-                    Guid.Parse("1DF25C51-29DD-4A00-AD26-0198B09DA036")
-                };
+                var knownNodes = Enumerable.Range(1, 5).Select(i => "node" + i);
 
                 var inMemoryTransport = new InMemoryTransport();
 
@@ -74,15 +67,17 @@ namespace TestConsoleApplication
                         Thread.Sleep(500);
                     }
                 },ct);
-/*
-               Thread.Sleep(3000);
-                var leaderId = nodes.First().LeaderId.Value;
+
+                Console.ReadLine();
+                var leaderId = nodes.First().LeaderId;
                 Console.WriteLine("Failing the leader" + leaderId);
                inMemoryTransport.EmulateConnectivityIssue(leaderId);
-               Thread.Sleep(1000);
+
+               Console.ReadLine();
                Console.WriteLine("Restoring ex leader" + leaderId);
                inMemoryTransport.RestoreConnectivity(leaderId);
-               Thread.Sleep(1000);*/
+               Thread.Sleep(1000);
+
                Console.ReadLine();
                 tokenSource2.Cancel();
 

@@ -9,8 +9,8 @@ namespace Inceptum.Raft
         DateTime EnterTime { get; }
         void Enter();
         void Timeout();
-        bool Handle(RequestVoteRequest request);
-        void Handle(RequestVoteResponse vote);
+        bool Handle(VoteRequest voteRequest);
+        void Handle(VoteResponse vote);
         bool Handle(AppendEntriesRequest<TCommand> request);
         void Handle(AppendEntriesResponse response);
         int GetTimeout(int electionTimeout);

@@ -29,6 +29,6 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The node identifier.
         /// </value>
-        public Guid NodeId { get; set; }
+        public string NodeId { get; set; }
     }
 }

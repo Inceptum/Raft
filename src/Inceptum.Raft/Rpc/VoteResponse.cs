@@ -5,7 +5,7 @@ namespace Inceptum.Raft.Rpc
     /// <summary>
     /// Response for RequestVote RPC
     /// </summary>
-    public class RequestVoteResponse
+    public class VoteResponse
     {
         /// <summary>
         /// Gets or sets the currentTerm, for candidate to update itself.
@@ -29,6 +29,6 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The node identifier.
         /// </value>
-        public Guid NodeId { get; set; }
+        public string NodeId { get; set; }
     }
 }

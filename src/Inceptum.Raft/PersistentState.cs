@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace Inceptum.Raft
@@ -26,7 +25,7 @@ namespace Inceptum.Raft
                     return;
                 }
 
-                VotedFor = default(Guid);
+                VotedFor = null;
                 m_CurrentTerm = value;
             }
         }
@@ -37,7 +36,7 @@ namespace Inceptum.Raft
         /// <value>
         /// The candidateId voted for.
         /// </value>
-        public Guid VotedFor { get; set; }
+        public string VotedFor { get; set; }
         /// <summary>
         /// Gets log entries; 
         /// each entry contains command for state machine, and term when entry was received by leader (first index is 1)
@@ -63,12 +62,15 @@ namespace Inceptum.Raft
             return prevLogIndex==-1 || Log[prevLogIndex].Term == prevLogTerm;
         }
 
-        public void DeleteEntriesAfter(int prevLogIndex)
+        public bool DeleteEntriesAfter(int prevLogIndex)
         {
             var index = prevLogIndex + 1;
-            if (index < Log.Count)
-                Log.RemoveRange(index, Log.Count - index);
+            if (index >= Log.Count) 
+                return false;
+            Log.RemoveRange(index, Log.Count - index);
+            return true;
         }
+
 
         public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {

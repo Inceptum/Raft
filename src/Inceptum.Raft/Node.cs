@@ -55,9 +55,9 @@ namespace Inceptum.Raft
         /// </value>
         public long LastApplied { get; private set; }
 
-        public Guid? LeaderId { get; private set; }
+        public string LeaderId { get; private set; }
 
-        public Guid Id { get; private set; }
+        public string Id { get; private set; }
 
         public NodeState State
         {
@@ -93,8 +93,8 @@ namespace Inceptum.Raft
 
             m_Subscriptions = new[]
             {
-                subscribe<RequestVoteRequest>(Handle),
-                subscribe<RequestVoteResponse>(Handle),
+                subscribe<VoteRequest>(Handle),
+                subscribe<VoteResponse>(Handle),
                 subscribe<AppendEntriesRequest<TCommand>>(Handle),
                 subscribe<AppendEntriesResponse>(Handle)
             };
@@ -178,7 +178,7 @@ namespace Inceptum.Raft
             switchTo(new Leader<TCommand>(this));
         }
 
-        internal void SwitchToFollower(Guid? leaderId)
+        internal void SwitchToFollower(string leaderId)
         {
             LeaderId = leaderId;
             switchTo(new Follower<TCommand>(this));
@@ -191,14 +191,14 @@ namespace Inceptum.Raft
         }
 
 
-        internal void AppendEntries(Guid node, AppendEntriesRequest<TCommand> request)
+        internal void AppendEntries(string node, AppendEntriesRequest<TCommand> request)
         {
             m_Transport.Send(Id, node, request);
         }
 
         internal void RequestVotes()
         {
-            var request = new RequestVoteRequest
+            var request = new VoteRequest
             {
                 CandidateId = Id,
                 Term = PersistentState.CurrentTerm,
@@ -219,7 +219,7 @@ namespace Inceptum.Raft
             {
                 Log("APPLY: {0}", PersistentState.Log[i].Command);
                 //TODO: actual commit logic
-                Console.WriteLine(Id+"> APPLY: " + PersistentState.Log[i].Command);
+                Console.WriteLine(Id+"|"+CurrentTerm+" > APPLY: " + PersistentState.Log[i].Command);
                 CommitIndex = i;
                 LastApplied = i;
             }
@@ -268,24 +268,24 @@ namespace Inceptum.Raft
             m_State.Handle(response);
         }
 
-        internal void Handle(RequestVoteRequest request)
+        internal void Handle(VoteRequest voteRequest)
         {
-            if (request.Term > PersistentState.CurrentTerm)
+            if (voteRequest.Term > PersistentState.CurrentTerm)
             {
-                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.CandidateId);
-                PersistentState.CurrentTerm = request.Term;
+                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, voteRequest.Term, voteRequest.CandidateId);
+                PersistentState.CurrentTerm = voteRequest.Term;
                 SwitchToFollower(null);
             }
 
-            bool granted = m_State.Handle(request);
+            bool granted = m_State.Handle(voteRequest);
             if (granted)
             {
-                PersistentState.VotedFor = request.CandidateId;
+                PersistentState.VotedFor = voteRequest.CandidateId;
                 ResetTimeout();
             }
 
-            m_Transport.Send(Id, request.CandidateId,
-                new RequestVoteResponse
+            m_Transport.Send(Id, voteRequest.CandidateId,
+                new VoteResponse
                 {
                     NodeId = Id,
                     Term = PersistentState.CurrentTerm,
@@ -293,7 +293,7 @@ namespace Inceptum.Raft
                 });
         }
 
-        internal void Handle(RequestVoteResponse vote)
+        internal void Handle(VoteResponse vote)
         {
             if (vote.Term > PersistentState.CurrentTerm)
             {

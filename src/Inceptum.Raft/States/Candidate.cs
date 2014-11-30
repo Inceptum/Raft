@@ -8,7 +8,7 @@ namespace Inceptum.Raft.States
 {
     class Candidate<TCommand> : NodeState<TCommand>
     {
-        private Dictionary<Guid, RequestVoteResponse> m_Votes;
+        private Dictionary<string, VoteResponse> m_Votes;
 
         public Candidate(Node<TCommand> node)
             : base(node,NodeState.Candidate)
@@ -27,9 +27,9 @@ namespace Inceptum.Raft.States
         {
             Node.ResetTimeout();
             Node.Log("Starting Election");
-            m_Votes = new Dictionary<Guid, RequestVoteResponse>();
+            m_Votes = new Dictionary<string, VoteResponse>();
             //vote for itself
-            Handle(new RequestVoteResponse
+            Handle(new VoteResponse
             {
                 NodeId = Node.Id,
                 Term = Node.IncrementTerm(),
@@ -45,13 +45,13 @@ namespace Inceptum.Raft.States
             startElection();
         }
 
-        public override bool Handle(RequestVoteRequest request)
+        public override bool Handle(VoteRequest voteRequest)
         {
             //term in request is not newer than our (otherwise state should have been already changed to follower)
             return false;
         }
 
-        public override void Handle(RequestVoteResponse vote)
+        public override void Handle(VoteResponse vote)
         {
             Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
 

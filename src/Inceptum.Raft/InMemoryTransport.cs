@@ -5,19 +5,19 @@ namespace Inceptum.Raft
 {
     public class InMemoryTransport : ITransport 
     {
-        readonly Dictionary<Tuple<Guid,Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<Guid, Type>, Action<object>>();
-        readonly List<Guid> m_FailedNodes=new List<Guid>();
-        public void EmulateConnectivityIssue(Guid nodeId)
+        readonly Dictionary<Tuple<string, Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<string, Type>, Action<object>>();
+        readonly List<string> m_FailedNodes = new List<string>();
+        public void EmulateConnectivityIssue(string nodeId)
         {
             m_FailedNodes.Add(nodeId);
         }
-        public void RestoreConnectivity(Guid nodeId)
+        public void RestoreConnectivity(string nodeId)
         {
             m_FailedNodes.Remove(nodeId);
         }
 
 
-        public void Send<T>(Guid from, Guid to, T message)
+        public void Send<T>(string from, string to, T message)
         {
             if(m_FailedNodes.Contains(to))
                 return;
@@ -32,7 +32,7 @@ namespace Inceptum.Raft
             }
         }
 
-        public IDisposable Subscribe<T>(Guid subscriberId, Action<T> handler)
+        public IDisposable Subscribe<T>(string subscriberId, Action<T> handler)
         {
             var key = Tuple.Create(subscriberId, typeof(T));
             lock (m_Subscriptions)

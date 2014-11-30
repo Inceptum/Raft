@@ -7,14 +7,21 @@ namespace Inceptum.Raft
     public class NodeConfiguration
     {
         public int ElectionTimeout { get; set; } 
-        public List<Guid> KnownNodes { get; set; } 
-        public Guid NodeId { get; set; }
+        public List<string> KnownNodes { get; set; }
+        public string NodeId { get; set; }
 
 
-        public NodeConfiguration(Guid nodeId, params Guid[] knownNodes)
+        public NodeConfiguration(string nodeId, params string[] knownNodes)
         {
+            if (string.IsNullOrEmpty(nodeId))
+                throw new ArgumentException("nodeId should be not empty string","nodeId");
+            if (knownNodes.Any(string.IsNullOrEmpty))
+                throw new ArgumentException("knownNodes should conatin only not empty string", "knownNodes");
+            if (knownNodes.Distinct().Count() != knownNodes.Count())
+                throw new ArgumentException("knownNodes should conatin unique node names", "knownNodes");
+
             NodeId = nodeId;
-            KnownNodes = knownNodes.Where(n=>n!=nodeId).ToList();
+            KnownNodes = knownNodes.Where(n=>n!=nodeId).Distinct().ToList();
         }
 
         public int Majority

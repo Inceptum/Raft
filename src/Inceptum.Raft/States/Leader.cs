@@ -14,23 +14,23 @@ namespace Inceptum.Raft.States
         /// <value>
         /// The next indexes.
         /// </value>
-        private Dictionary<Guid,int> NextIndexes { get; set; }
+        private Dictionary<string, int> NextIndexes { get; set; }
         /// <summary>
         /// For each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
         /// </summary>
         /// <value>
         /// The index of the match.
         /// </value>
-        private Dictionary<Guid, int> MatchIndex { get; set; }
+        private Dictionary<string, int> MatchIndex { get; set; }
 
-        private Dictionary<Guid, int> LastSentIndex { get; set; }
+        private Dictionary<string, int> LastSentIndex { get; set; }
 
         public Leader(Node<TCommand> node)
             : base(node,NodeState.Leader)
         {
-            NextIndexes = new Dictionary<Guid, int>();
-            MatchIndex = new Dictionary<Guid, int>();
-            LastSentIndex = new Dictionary<Guid, int>();
+            NextIndexes = new Dictionary<string, int>();
+            MatchIndex = new Dictionary<string, int>();
+            LastSentIndex = new Dictionary<string, int>();
         }
 
         public override void Enter()
@@ -80,6 +80,7 @@ namespace Inceptum.Raft.States
                     var entriesCount = Math.Min(20, Node.PersistentState.Log.Count - nextIndex); //TODO: move batch size to config (20)
                     logEntries = Node.PersistentState.Log.GetRange(nextIndex, entriesCount);
                     LastSentIndex[node] = nextIndex + entriesCount - 1;
+                    Console.WriteLine("{2} > Sending {0} entries to {1}",entriesCount,node,Node.Id);
                 }
 
                 var request = new AppendEntriesRequest<TCommand>
@@ -97,7 +98,7 @@ namespace Inceptum.Raft.States
 
         //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
 
-        public override bool Handle(RequestVoteRequest request)
+        public override bool Handle(VoteRequest voteRequest)
         {
             //Since state is not sitched to follower, term is older or same - decline
             return false;

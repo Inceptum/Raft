@@ -21,9 +21,9 @@ namespace Inceptum.Raft.States
             EnterTime = DateTime.Now;
         }
         public abstract void Timeout();
-        public abstract bool Handle(RequestVoteRequest request);
+        public abstract bool Handle(VoteRequest voteRequest);
 
-        public virtual void Handle( RequestVoteResponse vote)
+        public virtual void Handle( VoteResponse vote)
         {
             Node.Log("Ignoring RequestVoteResponse since node is not a candidate");
             

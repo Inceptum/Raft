@@ -22,7 +22,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The leader identifier.
         /// </value>
-        public Guid LeaderId { get; set; }
+        public string LeaderId { get; set; }
 
         /// <summary>
         /// Gets or sets the index of log entry immediately preceding new ones.

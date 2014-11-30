@@ -5,7 +5,7 @@ namespace Inceptum.Raft.Rpc
     /// <summary>
     /// Request for RequestVote RPC. Invoked by candidates to gather votes (§5.2).
     /// </summary>
-    public class RequestVoteRequest
+    public class VoteRequest
     {
         /// <summary>
         /// Gets or sets the candidate’s term
@@ -21,7 +21,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The candidate identifier.
         /// </value>
-        public Guid CandidateId { get; set; }
+        public string CandidateId { get; set; }
 
 
         /// <summary>

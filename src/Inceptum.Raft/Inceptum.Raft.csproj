@@ -56,8 +56,8 @@
     <Compile Include="PersistentState.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rpc\AppendEntriesResponse.cs" />
-    <Compile Include="Rpc\RequestVoteRequest.cs" />
-    <Compile Include="Rpc\RequestVoteResponse.cs" />
+    <Compile Include="Rpc\VoteRequest.cs" />
+    <Compile Include="Rpc\VoteResponse.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
