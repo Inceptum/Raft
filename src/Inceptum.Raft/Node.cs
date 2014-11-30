@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -66,6 +67,11 @@ namespace Inceptum.Raft
         public long CurrentTerm
         {
             get { return PersistentState.CurrentTerm; }
+        }
+       
+        public IEnumerable<ILogEntry<TCommand>> LogEntries
+        {
+            get { return PersistentState.Log; }
         }
 
         public DateTime CurrentStateEnterTime

@@ -101,7 +101,6 @@ namespace Inceptum.Raft.Tests
         }
 
         [Test]
-        //[Repeat(50)]
         public void ConsensusIsReachableWithin5ElectionTimeoutsTest()
         {
             const int electionTimeout = 150;
@@ -133,29 +132,6 @@ namespace Inceptum.Raft.Tests
                 }
 
                 Thread.Sleep(electionTimeout*5);
-                var follower = nodes.First(n=>n.State==NodeState.Follower);
-                Console.WriteLine("Failing the follower" + follower.Id);
-                inMemoryTransport.EmulateConnectivityIssue(follower.Id);
-                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
-
-                var exleader = nodes.First(n => n.State == NodeState.Leader);
-                exleader.Apply(1);
-                exleader.Apply(2);
-                exleader.Apply(3);
-
-                Thread.Sleep(1000);
-                Console.WriteLine("Failing the leader " + exleader.Id);
-                inMemoryTransport.EmulateConnectivityIssue(exleader.Id);
-                Thread.Sleep(1000);
-                Console.WriteLine("Restoring exleader " + exleader.Id);
-                inMemoryTransport.RestoreConnectivity(exleader.Id);
-                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
-                Console.WriteLine("Restoring follower " + follower.Id);
-                inMemoryTransport.RestoreConnectivity(follower.Id);
-                Thread.Sleep(1000);
-
-
-                Thread.Sleep(1000000);
 
                 var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
                 foreach (var node in nodes)
@@ -181,6 +157,79 @@ namespace Inceptum.Raft.Tests
                 Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
                 
                 //Debug.WriteLine("{0}\t{1}",(nodes.Single(n=>n.State==NodeState.Leader).CurrentStateEnterTime-start).TotalMilliseconds.ToString().Replace(".",","), term);
+            }
+            catch
+            {
+                Console.WriteLine();
+                Console.WriteLine(sb.ToString());
+                Console.WriteLine();
+                Console.WriteLine();
+                Console.WriteLine(Node<int>.m_Log);
+
+                throw;
+            }
+
+            finally
+            {
+                Console.WriteLine(Node<int>.m_Log);
+            }
+        }
+        [Test]
+        public void RestoredFollowerGetsAllMissedLogEntriesTest()
+        {
+            const int electionTimeout = 150;
+            Node<object>.m_Log.Clear();
+            var sb=new StringBuilder();
+            try
+            {
+                 var knownNodes = new List<Guid>
+                {
+                    Guid.Parse("AE34F270-A72B-4D23-9BBE-C660403690E0"),
+                    Guid.Parse("DAA588C4-26DD-451F-865C-5591E78994FB"),
+                    Guid.Parse("27AFDE7B-FD8E-4F8E-BA42-7DA24F8EE2E5"),
+                    Guid.Parse("DEE86807-E9BC-4927-B748-89C8101D826E"),
+                    Guid.Parse("1DF25C51-29DD-4A00-AD26-0198B09DA036")
+                };
+
+                var inMemoryTransport = new InMemoryTransport();
+ 
+                var nodes = knownNodes.Select(
+                    id => new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = electionTimeout},inMemoryTransport))
+                    .ToArray();
+
+                foreach (var node in nodes)
+                {
+                    node.Start();
+                }
+
+                Thread.Sleep(electionTimeout*5);
+                var follower = nodes.First(n=>n.State==NodeState.Follower);
+                Console.WriteLine("Failing the follower" + follower.Id);
+                inMemoryTransport.EmulateConnectivityIssue(follower.Id);
+                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
+
+                var exleader = nodes.First(n => n.State == NodeState.Leader);
+                exleader.Apply(1);
+                exleader.Apply(2);
+                exleader.Apply(3);
+
+                Thread.Sleep(electionTimeout * 5);
+                Console.WriteLine("Failing the leader " + exleader.Id);
+                inMemoryTransport.EmulateConnectivityIssue(exleader.Id);
+                Thread.Sleep(electionTimeout * 5);
+                Console.WriteLine("Restoring exleader " + exleader.Id);
+                inMemoryTransport.RestoreConnectivity(exleader.Id);
+                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
+                Console.WriteLine("Restoring follower " + follower.Id);
+                inMemoryTransport.RestoreConnectivity(follower.Id);
+                Thread.Sleep(electionTimeout * 5);
+
+                foreach (var node in nodes)
+                {
+                    node.Dispose();
+                }
+
+                Assert.That(follower.LogEntries.Count(), Is.EqualTo(3), "Missed log entries were not replicated");
             }
             catch
             {
