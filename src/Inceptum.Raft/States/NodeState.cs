@@ -43,5 +43,10 @@ namespace Inceptum.Raft.States
             var rnd = BitConverter.ToInt32(buf, 4) % electionTimeout;
             return rnd + electionTimeout;
         }
+
+        public virtual void Apply(TCommand command)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

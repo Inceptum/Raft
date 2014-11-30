@@ -40,8 +40,8 @@ namespace Inceptum.Raft.States
             foreach (var node in Node.Configuration.KnownNodes)
             {
                 NextIndexes[node] = Node.PersistentState.Log.Count;
-                MatchIndex[node] = 0;
-                LastSentIndex[node] = 0;
+                MatchIndex[node] = -1;
+                LastSentIndex[node] = -1;
             }
             Node.ResetTimeout();
             Timeout();
@@ -57,22 +57,44 @@ namespace Inceptum.Raft.States
         {
             Node.Log("I AM THE LEADER!!!!! Sending HB");
             //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
+            appendEntries();
+        }
 
-            var request = new AppendEntriesRequest<TCommand>
-            {
-                Term = Node.PersistentState.CurrentTerm,
-                Entries = new ILogEntry<TCommand>[0],
-                LeaderCommit = Node.CommitIndex,
-                LeaderId = Node.Id,
-                PrevLogIndex = Node.PersistentState.Log.Count - 1,
-                PrevLogTerm = Node.PersistentState.Log.Select(e => e.Term).LastOrDefault()
-            };
+        public override void Apply(TCommand command)
+        {
+            Node.PersistentState.Append(command);
+            //TODO: proxy to leader
+            appendEntries();
+            Node.ResetTimeout();
+        }
 
+        private void appendEntries()
+        {
             foreach (var node in Node.Configuration.KnownNodes)
             {
+                var nextIndex = NextIndexes[node];
+
+                IEnumerable<ILogEntry<TCommand>> logEntries = new ILogEntry<TCommand>[0];
+                if (nextIndex < Node.PersistentState.Log.Count)
+                {
+                    var entriesCount = Math.Min(20, Node.PersistentState.Log.Count - nextIndex); //TODO: move batch size to config (20)
+                    logEntries = Node.PersistentState.Log.GetRange(nextIndex, entriesCount);
+                    LastSentIndex[node] = nextIndex + entriesCount - 1;
+                }
+
+                var request = new AppendEntriesRequest<TCommand>
+                {
+                    Term = Node.PersistentState.CurrentTerm,
+                    Entries = logEntries,
+                    LeaderCommit = Node.CommitIndex,
+                    LeaderId = Node.Id,
+                    PrevLogIndex = nextIndex > 0 ? nextIndex - 1 : -1,
+                    PrevLogTerm = nextIndex > 0 ? Node.PersistentState.Log[nextIndex - 1].Term : -1
+                };
                 Node.AppendEntries(node, request);
             }
         }
+
         //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
 
         public override bool Handle(RequestVoteRequest request)
@@ -95,22 +117,19 @@ namespace Inceptum.Raft.States
             {
                 MatchIndex[node] = LastSentIndex[node];
                 NextIndexes[node] = LastSentIndex[node] + 1;
+                if (!Node.PersistentState.Log.Any()) 
+                    return;
+
+                for (var i = Node.CommitIndex+1; i <= MatchIndex.Values.Max(); i++)
+                {
+                    if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Configuration.Majority &&
+                        Node.PersistentState.Log[i].Term == Node.CurrentTerm)
+                        Node.CommitIndex = i;
+                }
             }
             else
             {
-                var nextIndex=--NextIndexes[node];
-                var lastSentIndex = Node.PersistentState.Log.Count;
-                var request = new AppendEntriesRequest<TCommand>
-                {
-                    Term = Node.PersistentState.CurrentTerm,
-                    Entries = Node.PersistentState.Log.GetRange(nextIndex, lastSentIndex-nextIndex),
-                    LeaderCommit = Node.CommitIndex,
-                    LeaderId = Node.Id,
-                    PrevLogIndex = lastSentIndex - 1,
-                    PrevLogTerm = Node.PersistentState.Log.Select(e => e.Term).LastOrDefault()
-                };
-                LastSentIndex[node] = lastSentIndex;
-                Node.AppendEntries(node, request);
+                NextIndexes[node]--;
             }
 
         }

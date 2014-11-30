@@ -60,7 +60,7 @@ namespace Inceptum.Raft
             if ( prevLogIndex >= Log.Count)
                 return false;
 
-            return Log[prevLogIndex].Term == prevLogTerm;
+            return prevLogIndex==-1 || Log[prevLogIndex].Term == prevLogTerm;
         }
 
         public void DeleteEntriesAfter(int prevLogIndex)
@@ -73,6 +73,11 @@ namespace Inceptum.Raft
         public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {
             Log.AddRange(entries);
+        }
+
+        public void Append(TCommand command)
+        {
+            Log.Add(new LogEntry<TCommand>(CurrentTerm, command));
         }
 
         public bool IsLogOlderOrEqual(long lastLogIndex, long lastLogTerm)

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
@@ -38,7 +39,7 @@ namespace Inceptum.Raft.States
 
         public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
-
+           
             //Reply false if term < currentTerm (§5.1)
             if (request.Term < Node.PersistentState.CurrentTerm)
                 return false;

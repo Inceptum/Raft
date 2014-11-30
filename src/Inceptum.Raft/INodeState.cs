@@ -14,5 +14,6 @@ namespace Inceptum.Raft
         bool Handle(AppendEntriesRequest<TCommand> request);
         void Handle(AppendEntriesResponse response);
         int GetTimeout(int electionTimeout);
+        void Apply(TCommand command);
     }
 }

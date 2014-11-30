@@ -44,7 +44,7 @@ namespace Inceptum.Raft
         /// <value>
         ///     The index of the commit.
         /// </value>
-        public int CommitIndex { get; private set; }
+        public int CommitIndex { get; internal set; }
 
         /// <summary>
         ///     Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
@@ -94,6 +94,8 @@ namespace Inceptum.Raft
             };
 
             m_TimeoutBase = Configuration.ElectionTimeout;
+            CommitIndex = -1;
+            LastApplied = -1;
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -117,7 +119,10 @@ namespace Inceptum.Raft
 
         public void Apply(TCommand command)
         {
-            //TODO: proxy to leader
+            lock(m_SyncRoot)
+            {
+                m_State.Apply(command);
+            }
         }
 
         private void timeoutHandlingLoop(object obj)
@@ -206,8 +211,9 @@ namespace Inceptum.Raft
             Log("Got HB from leader:{0}", LeaderId);
             for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
+                Log("APPLY: {0}", PersistentState.Log[i].Command);
                 //TODO: actual commit logic
-                Console.WriteLine("APPLY: " + PersistentState.Log[i].Command);
+                Console.WriteLine(Id+"> APPLY: " + PersistentState.Log[i].Command);
                 CommitIndex = i;
                 LastApplied = i;
             }

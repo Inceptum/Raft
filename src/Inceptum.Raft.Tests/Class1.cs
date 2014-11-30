@@ -123,7 +123,7 @@ namespace Inceptum.Raft.Tests
               //     knownNodes = Enumerable.Range(1, 20).Select(z => Guid.NewGuid()).ToList();
 
                 var nodes = knownNodes.Select(
-                    id => new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = electionTimeout},inMemoryTransport))
+                    id => new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) {ElectionTimeout = electionTimeout},inMemoryTransport))
                     .ToArray();
 
                 var start = DateTime.Now;
@@ -132,8 +132,30 @@ namespace Inceptum.Raft.Tests
                     node.Start();
                 }
 
-                //Thread.Sleep(electionTimeout*5);
-                Thread.Sleep(15000);
+                Thread.Sleep(electionTimeout*5);
+                var follower = nodes.First(n=>n.State==NodeState.Follower);
+                Console.WriteLine("Failing the follower" + follower.Id);
+                inMemoryTransport.EmulateConnectivityIssue(follower.Id);
+                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
+
+                var exleader = nodes.First(n => n.State == NodeState.Leader);
+                exleader.Apply(1);
+                exleader.Apply(2);
+                exleader.Apply(3);
+
+                Thread.Sleep(1000);
+                Console.WriteLine("Failing the leader " + exleader.Id);
+                inMemoryTransport.EmulateConnectivityIssue(exleader.Id);
+                Thread.Sleep(1000);
+                Console.WriteLine("Restoring exleader " + exleader.Id);
+                inMemoryTransport.RestoreConnectivity(exleader.Id);
+                Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Leader).Id);
+                Console.WriteLine("Restoring follower " + follower.Id);
+                inMemoryTransport.RestoreConnectivity(follower.Id);
+                Thread.Sleep(1000);
+
+
+                Thread.Sleep(1000000);
 
                 var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
                 foreach (var node in nodes)
@@ -166,14 +188,14 @@ namespace Inceptum.Raft.Tests
                 Console.WriteLine(sb.ToString());
                 Console.WriteLine();
                 Console.WriteLine();
-                Console.WriteLine(Node<object>.m_Log);
+                Console.WriteLine(Node<int>.m_Log);
 
                 throw;
             }
 
             finally
             {
-                Console.WriteLine(Node<object>.m_Log);
+                Console.WriteLine(Node<int>.m_Log);
             }
         }
     }
