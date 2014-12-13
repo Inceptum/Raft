@@ -125,7 +125,7 @@ namespace Inceptum.Raft.States
                 {
                     if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Configuration.Majority &&
                         Node.PersistentState.Log[i].Term == Node.CurrentTerm)
-                        Node.CommitIndex = i;
+                        Node.Commit(i);
                 }
             }
             else

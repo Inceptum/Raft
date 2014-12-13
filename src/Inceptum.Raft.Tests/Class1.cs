@@ -10,6 +10,14 @@ using NUnit.Framework;
 
 namespace Inceptum.Raft.Tests
 {
+    class StateMachine:IStateMachine<int>
+    {
+        public int Value { get; set; }
+        public void Apply(int command)
+        {
+            Value += command;
+        }
+    }
     [TestFixture]
     public class Class1
     {
@@ -74,7 +82,7 @@ namespace Inceptum.Raft.Tests
             Node<object>.m_Log.Clear();
             var inMemoryTransport = new InMemoryTransport();
             var nodes = m_KnownNodes.Select(
-                id => new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, inMemoryTransport))
+                id => new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, inMemoryTransport,new StateMachine()))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -100,10 +108,11 @@ namespace Inceptum.Raft.Tests
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
             var inMemoryTransport = new InMemoryTransport();
+            var stateMachines = m_KnownNodes.ToDictionary(k=>k,v=>new StateMachine());
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        inMemoryTransport))
+                        inMemoryTransport, stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -136,6 +145,9 @@ namespace Inceptum.Raft.Tests
 
 
             nodes.ForEach(n => n.Dispose());
+            var states = stateMachines.Values.Select(m=>m.Value);
+            Assert.That(states,Is.EqualTo(m_KnownNodes.Select(n=>6)),"Nodes have wrong states applied by state machines");
+            Console.WriteLine(states.First());
             Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
             Assert.That(follower.LogEntries.Count(), Is.EqualTo(3), "Missed log entries were not replicated");
         }

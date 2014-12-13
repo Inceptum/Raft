@@ -10,6 +10,14 @@ using Inceptum.Raft;
 
 namespace TestConsoleApplication
 {
+    class StateMachine : IStateMachine<int>
+    {
+        public int Value { get; set; }
+        public void Apply(int command)
+        {
+            Value += command;
+        }
+    }
     class Program
     {
         private static  PerformanceCounter m_CpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); 
@@ -30,8 +38,8 @@ namespace TestConsoleApplication
 
                 var nodes = knownNodes.Select(
                     id =>
-                        new Node<object>(new PersistentState<object>(), new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                            inMemoryTransport))
+                        new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                            inMemoryTransport, new StateMachine()))
                     .ToArray();
 
                 var start = DateTime.Now;

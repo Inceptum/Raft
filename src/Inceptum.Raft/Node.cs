@@ -28,6 +28,7 @@ namespace Inceptum.Raft
         private readonly ITransport m_Transport;
         private INodeState<TCommand> m_State;
         private int m_TimeoutBase;
+        private IStateMachine<TCommand> m_StateMachine;
 
         public NodeConfiguration Configuration { get; private set; }
 
@@ -79,8 +80,9 @@ namespace Inceptum.Raft
             get { return m_State.EnterTime; }
         }
 
-        public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport)
+        public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
         {
+            m_StateMachine = stateMachine;
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
@@ -218,6 +220,7 @@ namespace Inceptum.Raft
             for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
                 Log("APPLY: {0}", PersistentState.Log[i].Command);
+                m_StateMachine.Apply(PersistentState.Log[i].Command);
                 //TODO: actual commit logic
                 Console.WriteLine(Id+"|"+CurrentTerm+" > APPLY: " + PersistentState.Log[i].Command);
                 CommitIndex = i;
