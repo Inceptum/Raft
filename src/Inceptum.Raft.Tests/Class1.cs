@@ -195,5 +195,37 @@ namespace Inceptum.Raft.Tests
             Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
             Assert.That(follower.LogEntries.Count(), Is.EqualTo(3), "Missed log entries were not replicated");
         }
+
+        [Test]
+        public void LongStateMachineCommandProcessingTimeTest()
+        {
+            const int electionTimeout = 150;
+            Node<object>.m_Log.Clear();
+            var inMemoryTransport = new InMemoryTransport();
+            var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
+            var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
+            var nodes = m_KnownNodes.Select(
+                id =>
+                    new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                        inMemoryTransport, stateMachines[id]))
+                .ToList();
+            nodes.ForEach(n => n.Start());
+            Thread.Sleep(electionTimeout * 5);
+            var leader = nodes.First(n => n.State == NodeState.Leader);
+
+            leader.Apply(1);
+            leader.Apply(2);
+            leader.Apply(3);
+
+
+            Thread.Sleep(2000);
+
+
+            nodes.ForEach(n => n.Dispose());
+            var states = stateMachines.Values.Select(m=>m.Value);
+            Assert.That(states,Is.EqualTo(m_KnownNodes.Select(n=>6)),"Nodes have wrong states applied by state machines");
+            Console.WriteLine(states.First());
+            Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
+        }
     }
 }
