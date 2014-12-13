@@ -24,14 +24,16 @@ namespace Inceptum.Raft
         /// Initializes a new instance of the <see cref="SingleThreadTaskScheduler" /> passsing an initialization action, optionally setting an <see cref="System.Threading.ApartmentState" />.
         /// </summary>
         /// <param name="threadPriority">The thread priority.</param>
-        public SingleThreadTaskScheduler(ThreadPriority threadPriority)
+        /// <param name="threadName">Thread name</param>
+        public SingleThreadTaskScheduler(ThreadPriority threadPriority, string threadName=null)
         {
             m_CancellationToken = new CancellationTokenSource();
             m_Tasks = new BlockingCollection<Task>();
             m_Thread = new Thread(threadStart)
             {
                 IsBackground = true, 
-                Priority = threadPriority
+                Priority = threadPriority,
+                Name = threadName
             };
 
             m_Thread.Start();

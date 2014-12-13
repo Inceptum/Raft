@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Inceptum.Raft
 {
@@ -77,9 +78,11 @@ namespace Inceptum.Raft
             Log.AddRange(entries);
         }
 
-        public void Append(TCommand command)
+        public TaskCompletionSource<object> Append(TCommand command)
         {
-            Log.Add(new LogEntry<TCommand>(CurrentTerm, command));
+            var logEntry = new LogEntry<TCommand>(CurrentTerm, command);
+            Log.Add(logEntry);
+            return logEntry.Completion;
         }
 
         public bool IsLogOlderOrEqual(long lastLogIndex, long lastLogTerm)

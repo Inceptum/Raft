@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,16 +20,17 @@ namespace Inceptum.Raft
     public class Node<TCommand> : IDisposable
     {
         public static readonly StringBuilder m_Log = new StringBuilder();
-        private readonly AutoResetEvent m_Reset = new AutoResetEvent(false);
+        private readonly AutoResetEvent m_ResetTimeout = new AutoResetEvent(false);
         private readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
-        private readonly SingleThreadTaskScheduler m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal);
+        private readonly SingleThreadTaskScheduler m_Scheduler;
         private readonly IDisposable[] m_Subscriptions;
         private readonly object m_SyncRoot = new object();
         private readonly Thread m_TimeoutHandlingThread;
         private readonly ITransport m_Transport;
         private INodeState<TCommand> m_State;
         private int m_TimeoutBase;
-        private IStateMachine<TCommand> m_StateMachine;
+        private readonly IStateMachine<TCommand> m_StateMachine;
+        private readonly SingleThreadTaskScheduler m_StateMachineScheduler;
 
         public NodeConfiguration Configuration { get; private set; }
 
@@ -82,6 +84,8 @@ namespace Inceptum.Raft
 
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
         {
+            m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
+            m_StateMachineScheduler = new SingleThreadTaskScheduler(ThreadPriority.Normal, string.Format("Raft StateMachine Thread {0}", configuration.NodeId));
             m_StateMachine = stateMachine;
             m_Transport = transport;
             Id = configuration.NodeId;
@@ -127,11 +131,14 @@ namespace Inceptum.Raft
 
         public void Apply(TCommand command)
         {
-            lock(m_SyncRoot)
+            Task<object> apply;
+            lock (m_SyncRoot)
             {
-                m_State.Apply(command);
+                apply = m_State.Apply(command);
             }
+            apply.Wait();
         }
+ 
 
         private void timeoutHandlingLoop(object obj)
         {
@@ -141,9 +148,9 @@ namespace Inceptum.Raft
             while (res != 0)
             {
                 int timeoutBase = m_TimeoutBase;
-                res = WaitHandle.WaitAny(new WaitHandle[] {m_Stop, m_Reset}, timeoutBase);
+                res = WaitHandle.WaitAny(new WaitHandle[] {m_Stop, m_ResetTimeout}, timeoutBase);
                 //If CPU is loaded it is possible that after m_Reset is set, context would be swithed after timout has ended.
-                res = m_Reset.WaitOne(0) ? 1 : res;
+                res = m_ResetTimeout.WaitOne(0) ? 1 : res;
 
                 if (res == WaitHandle.WaitTimeout)
                 {
@@ -157,7 +164,7 @@ namespace Inceptum.Raft
                 {
                     Log("Timeout reset");
                 }
-                m_Reset.Reset();
+                m_ResetTimeout.Reset();
             }
         }
 
@@ -165,7 +172,7 @@ namespace Inceptum.Raft
         {
             m_TimeoutBase = m_State.GetTimeout(Configuration.ElectionTimeout);
             Log("timeout reset for {0}", m_TimeoutBase);
-            m_Reset.Set();
+            m_ResetTimeout.Set();
         }
 
         internal void SwitchToCandidate()
@@ -213,18 +220,34 @@ namespace Inceptum.Raft
                 m_Transport.Send(Id, node, request);
             }
         }
-
         internal void Commit(long leaderCommit)
         {
             Log("Got HB from leader:{0}", LeaderId);
-            for (int i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
+            if (CommitIndex + 1 <= Math.Min(leaderCommit, PersistentState.Log.Count - 1))
+            Console.WriteLine(Id + "|" + CurrentTerm + " > Commit starting with: " + leaderCommit);
+            for (var i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
             {
-                Log("APPLY: {0}", PersistentState.Log[i].Command);
-                m_StateMachine.Apply(PersistentState.Log[i].Command);
-                //TODO: actual commit logic
-                Console.WriteLine(Id+"|"+CurrentTerm+" > APPLY: " + PersistentState.Log[i].Command);
+                
                 CommitIndex = i;
-                LastApplied = i;
+                var index = i;
+                var logEntry = PersistentState.Log[index];
+                Task.Factory.StartNew(() =>
+                {
+                    var newGuid = Guid.NewGuid();
+                    Log("APPLING: {0} ({1})", logEntry.Command,logEntry.GetHashCode());
+                    m_StateMachine.Apply(logEntry.Command);
+                    
+                    logEntry.Completion.SetResult(null);//report completion
+                    
+                    //TODO: actual commit logic
+                    lock (m_SyncRoot)
+                    {
+                        LastApplied = index;
+                    }
+                    Log("APPLIED: {0} ({1})", logEntry.Command, logEntry.GetHashCode());
+                    Console.WriteLine(Thread.CurrentThread.ManagedThreadId + "> " + Id + "|" + CurrentTerm + " > APPLIED: " + index);
+
+                }, CancellationToken.None, TaskCreationOptions.None, m_StateMachineScheduler);
             }
         }
 

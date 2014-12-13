@@ -1,4 +1,7 @@
-﻿namespace Inceptum.Raft
+﻿using System.Threading;
+using System.Threading.Tasks;
+
+namespace Inceptum.Raft
 {
     public interface ILogEntry<out TCommand>
     {
@@ -16,5 +19,8 @@
         /// The command.
         /// </value>
         TCommand Command { get; }
+
+        TaskCompletionSource<object> Completion { get; }
+  
     }
 }

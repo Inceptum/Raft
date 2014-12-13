@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft
@@ -14,6 +15,6 @@ namespace Inceptum.Raft
         bool Handle(AppendEntriesRequest<TCommand> request);
         void Handle(AppendEntriesResponse response);
         int GetTimeout(int electionTimeout);
-        void Apply(TCommand command);
+        Task<object> Apply(TCommand command);
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
@@ -44,7 +45,7 @@ namespace Inceptum.Raft.States
             return rnd + electionTimeout;
         }
 
-        public virtual void Apply(TCommand command)
+        public virtual Task<object> Apply(TCommand command)
         {
             throw new NotImplementedException();
         }

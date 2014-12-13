@@ -6,15 +6,28 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using NUnit.Framework;
 
 namespace Inceptum.Raft.Tests
 {
     class StateMachine:IStateMachine<int>
     {
+        private Action m_BeforeApply;
+
+        public StateMachine():this(() => { })
+        {
+        }
+
+        public StateMachine(Action beforeApply)
+        {
+            m_BeforeApply = beforeApply;
+        }
+
         public int Value { get; set; }
         public void Apply(int command)
         {
+            m_BeforeApply();
             Value += command;
         }
     }
@@ -101,6 +114,37 @@ namespace Inceptum.Raft.Tests
             Assert.That(term, Is.LessThan(10), "Term is more then 10");
             Assert.That(nodeStates.Select(n => n.LeaderId).Distinct().Count(), Is.EqualTo(1), "LeaderId is not the same for all nodes");
         }
+
+        [Test]
+        public void CommandApplyAwaitsForStateMachineToProcessCoommandTest()
+        {
+            const int electionTimeout = 150;
+            Node<object>.m_Log.Clear();
+            var inMemoryTransport = new InMemoryTransport();
+            var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
+            var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
+            var nodes = m_KnownNodes.Select(
+                id =>
+                    new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
+                        inMemoryTransport, stateMachines[id]))
+                .ToList();
+            nodes.ForEach(n => n.Start());
+
+            Thread.Sleep(electionTimeout * 5);
+            var leader = nodes.First(n => n.State == NodeState.Leader);
+
+            ManualResetEvent exited=new ManualResetEvent(false);
+            Task.Factory.StartNew(() => {
+                leader.Apply(10);
+                exited.Set();
+            });
+            Assert.That(exited.WaitOne(500),Is.False);
+            canApply[leader.Id].Set();
+            Assert.That(exited.WaitOne(500), Is.True);
+
+            nodes.ForEach(n => n.Dispose());
+        }
+
 
         [Test]
         public void RestoredFollowerGetsAllMissedLogEntriesTest()

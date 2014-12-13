@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
@@ -60,12 +61,13 @@ namespace Inceptum.Raft.States
             appendEntries();
         }
 
-        public override void Apply(TCommand command)
+        public override Task<object> Apply(TCommand command)
         {
-            Node.PersistentState.Append(command);
+            var completion = Node.PersistentState.Append(command);
             //TODO: proxy to leader
             appendEntries();
             Node.ResetTimeout();
+            return completion.Task;
         }
 
         private void appendEntries()
@@ -86,7 +88,8 @@ namespace Inceptum.Raft.States
                 var request = new AppendEntriesRequest<TCommand>
                 {
                     Term = Node.PersistentState.CurrentTerm,
-                    Entries = logEntries,
+                    //TODO: need to arrange this. Cloning is required since command completion is stored in log entry. It is wrong.
+                    Entries = logEntries.Select(e=>new LogEntry<TCommand>(e.Term,e.Command)),
                     LeaderCommit = Node.CommitIndex,
                     LeaderId = Node.Id,
                     PrevLogIndex = nextIndex > 0 ? nextIndex - 1 : -1,
@@ -125,7 +128,10 @@ namespace Inceptum.Raft.States
                 {
                     if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Configuration.Majority &&
                         Node.PersistentState.Log[i].Term == Node.CurrentTerm)
+                    {
+                        Console.WriteLine(Node.Id + "|" + Node.CurrentTerm + " > APPLY(leader): " + i);
                         Node.Commit(i);
+                    }
                 }
             }
             else
