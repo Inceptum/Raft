@@ -20,7 +20,7 @@ namespace Inceptum.Raft
         /// </value>
         TCommand Command { get; }
 
-        //TODO: I do not like string it here. LogEntry is about data only.
+        //TODO: I do not like storing it here. LogEntry is about data only.
         TaskCompletionSource<object> Completion { get; }
   
     }
