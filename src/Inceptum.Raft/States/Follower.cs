@@ -39,6 +39,7 @@ namespace Inceptum.Raft.States
 
         public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
+            Node.Log("Got HB from leader:{0}", Node.LeaderId);
 
             //Reply false if term < currentTerm (§5.1)
             if (request.Term < Node.PersistentState.CurrentTerm)
@@ -66,6 +67,7 @@ namespace Inceptum.Raft.States
 
             if(request.Entries.Any())
                 Console.WriteLine("{1} > Accepting AppendEntries from {0} ", request.LeaderId, Node.Id);
+
             // If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
             Node.Commit(request.LeaderCommit);
 

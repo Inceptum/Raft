@@ -30,7 +30,8 @@ namespace Inceptum.Raft
         private INodeState<TCommand> m_State;
         private int m_TimeoutBase;
         private readonly IStateMachine<TCommand> m_StateMachine;
-        private readonly SingleThreadTaskScheduler m_StateMachineScheduler;
+        private StateMachineHost<TCommand> m_StateMachineHost;
+
 
         public NodeConfiguration Configuration { get; private set; }
 
@@ -56,7 +57,7 @@ namespace Inceptum.Raft
         /// <value>
         ///     The last applied  log entry index.
         /// </value>
-        public long LastApplied { get; private set; }
+        public long LastApplied { get { return m_StateMachineHost.LastApplied; } }
 
         public string LeaderId { get; private set; }
 
@@ -85,7 +86,7 @@ namespace Inceptum.Raft
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
         {
             m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
-            m_StateMachineScheduler = new SingleThreadTaskScheduler(ThreadPriority.Normal, string.Format("Raft StateMachine Thread {0}", configuration.NodeId));
+            m_StateMachineHost = new StateMachineHost<TCommand>(stateMachine, configuration.NodeId, persistentState);
             m_StateMachine = stateMachine;
             m_Transport = transport;
             Id = configuration.NodeId;
@@ -107,7 +108,6 @@ namespace Inceptum.Raft
 
             m_TimeoutBase = Configuration.ElectionTimeout;
             CommitIndex = -1;
-            LastApplied = -1;
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -222,33 +222,7 @@ namespace Inceptum.Raft
         }
         internal void Commit(long leaderCommit)
         {
-            Log("Got HB from leader:{0}", LeaderId);
-            if (CommitIndex + 1 <= Math.Min(leaderCommit, PersistentState.Log.Count - 1))
-            Console.WriteLine(Id + "|" + CurrentTerm + " > Commit starting with: " + leaderCommit);
-            for (var i = CommitIndex + 1; i <= Math.Min(leaderCommit, PersistentState.Log.Count - 1); i++)
-            {
-                
-                CommitIndex = i;
-                var index = i;
-                var logEntry = PersistentState.Log[index];
-                Task.Factory.StartNew(() =>
-                {
-                    var newGuid = Guid.NewGuid();
-                    Log("APPLING: {0} ({1})", logEntry.Command,logEntry.GetHashCode());
-                    m_StateMachine.Apply(logEntry.Command);
-                    
-                    logEntry.Completion.SetResult(null);//report completion
-                    
-                    //TODO: actual commit logic
-                    lock (m_SyncRoot)
-                    {
-                        LastApplied = index;
-                    }
-                    Log("APPLIED: {0} ({1})", logEntry.Command, logEntry.GetHashCode());
-                    Console.WriteLine(Thread.CurrentThread.ManagedThreadId + "> " + Id + "|" + CurrentTerm + " > APPLIED: " + index);
-
-                }, CancellationToken.None, TaskCreationOptions.None, m_StateMachineScheduler);
-            }
+            CommitIndex = m_StateMachineHost.Apply(CommitIndex + 1, (int) leaderCommit);
         }
 
         internal long IncrementTerm()

@@ -88,8 +88,7 @@ namespace Inceptum.Raft.States
                 var request = new AppendEntriesRequest<TCommand>
                 {
                     Term = Node.PersistentState.CurrentTerm,
-                    //TODO: need to arrange this. Cloning is required since command completion is stored in log entry. It is wrong.
-                    Entries = logEntries.Select(e=>new LogEntry<TCommand>(e.Term,e.Command)),
+                    Entries = logEntries,
                     LeaderCommit = Node.CommitIndex,
                     LeaderId = Node.Id,
                     PrevLogIndex = nextIndex > 0 ? nextIndex - 1 : -1,

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Inceptum.Raft
@@ -75,7 +76,7 @@ namespace Inceptum.Raft
 
         public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {
-            Log.AddRange(entries);
+            Log.AddRange(entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)));
         }
 
         public TaskCompletionSource<object> Append(TCommand command)
