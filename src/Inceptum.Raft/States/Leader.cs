@@ -80,7 +80,7 @@ namespace Inceptum.Raft.States
                 if (nextIndex < Node.PersistentState.Log.Count)
                 {
                     var entriesCount = Math.Min(20, Node.PersistentState.Log.Count - nextIndex); //TODO: move batch size to config (20)
-                    logEntries = Node.PersistentState.Log.GetRange(nextIndex, entriesCount);
+                    logEntries = Node.PersistentState.GetRange(nextIndex, entriesCount);
                     LastSentIndex[node] = nextIndex + entriesCount - 1;
                     Console.WriteLine("{2} > Sending {0} entries to {1}",entriesCount,node,Node.Id);
                 }

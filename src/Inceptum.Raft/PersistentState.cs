@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -10,6 +11,7 @@ namespace Inceptum.Raft
     public class PersistentState<TCommand>
     {
         private long m_CurrentTerm;
+        private readonly List<ILogEntry<TCommand>> m_Log;
 
         /// <summary>
         /// Gets or sets the current term.
@@ -39,6 +41,7 @@ namespace Inceptum.Raft
         /// The candidateId voted for.
         /// </value>
         public string VotedFor { get; set; }
+
         /// <summary>
         /// Gets log entries; 
         /// each entry contains command for state machine, and term when entry was received by leader (first index is 1)
@@ -46,52 +49,60 @@ namespace Inceptum.Raft
         /// <value>
         /// The log.
         /// </value>
-        public List<ILogEntry<TCommand>> Log { get; private set; }
+        public IList<ILogEntry<TCommand>> Log
+        {
+            get { return new ReadOnlyCollection<ILogEntry<TCommand>>(m_Log); }
+        }
 
         public PersistentState()
         {
-            Log = new List<ILogEntry<TCommand>>();
+            m_Log = new List<ILogEntry<TCommand>>();
         }
 
         public bool EntryTermMatches(int prevLogIndex, long prevLogTerm)
         {
-            if (prevLogIndex < 0 && Log.Count == 0)
+            if (prevLogIndex < 0 && m_Log.Count == 0)
                 return prevLogIndex == -1;
 
-            if ( prevLogIndex >= Log.Count)
+            if (prevLogIndex >= m_Log.Count)
                 return false;
 
-            return prevLogIndex==-1 || Log[prevLogIndex].Term == prevLogTerm;
+            return prevLogIndex == -1 || m_Log[prevLogIndex].Term == prevLogTerm;
         }
 
         public bool DeleteEntriesAfter(int prevLogIndex)
         {
             var index = prevLogIndex + 1;
-            if (index >= Log.Count) 
+            if (index >= m_Log.Count) 
                 return false;
-            Log.RemoveRange(index, Log.Count - index);
+            m_Log.RemoveRange(index, m_Log.Count - index);
             return true;
         }
 
 
         public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {
-            Log.AddRange(entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)));
+            m_Log.AddRange(entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)));
         }
 
         public TaskCompletionSource<object> Append(TCommand command)
         {
             var logEntry = new LogEntry<TCommand>(CurrentTerm, command);
-            Log.Add(logEntry);
+            m_Log.Add(logEntry);
             return logEntry.Completion;
         }
 
         public bool IsLogOlderOrEqual(long lastLogIndex, long lastLogTerm)
         {
-            if (Log.Count == 0)
+            if (m_Log.Count == 0)
                 return true;
-            var lastEntry = Log[Log.Count - 1];
-            return lastEntry.Term < lastLogTerm ||(lastEntry.Term == lastLogTerm && lastLogIndex >= Log.Count-1);
+            var lastEntry = m_Log[m_Log.Count - 1];
+            return lastEntry.Term < lastLogTerm || (lastEntry.Term == lastLogTerm && lastLogIndex >= m_Log.Count - 1);
+        }
+
+        public IEnumerable<ILogEntry<TCommand>> GetRange(int index, int entriesCount)
+        {
+            return m_Log.GetRange(index, entriesCount);
         }
     }
 }
