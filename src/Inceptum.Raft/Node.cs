@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,8 +28,7 @@ namespace Inceptum.Raft
         private readonly ITransport m_Transport;
         private INodeState<TCommand> m_State;
         private int m_TimeoutBase;
-        private readonly IStateMachine<TCommand> m_StateMachine;
-        private StateMachineHost<TCommand> m_StateMachineHost;
+        private readonly StateMachineHost<TCommand> m_StateMachineHost;
 
 
         public NodeConfiguration Configuration { get; private set; }
@@ -49,7 +47,7 @@ namespace Inceptum.Raft
         /// <value>
         ///     The index of the commit.
         /// </value>
-        public int CommitIndex { get; internal set; }
+        public int CommitIndex { get; private set; }
 
         /// <summary>
         ///     Gets the index of highest log entry applied to statemachine (initialized to 0, increases monotonically)
@@ -87,7 +85,6 @@ namespace Inceptum.Raft
         {
             m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
             m_StateMachineHost = new StateMachineHost<TCommand>(stateMachine, configuration.NodeId, persistentState);
-            m_StateMachine = stateMachine;
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
@@ -142,7 +139,7 @@ namespace Inceptum.Raft
 
         private void timeoutHandlingLoop(object obj)
         {
-            Thread.CurrentThread.Name = Id.ToString();
+            Thread.CurrentThread.Name = Id;
             int res = -1;
 
             while (res != 0)
