@@ -64,15 +64,22 @@ namespace Inceptum.Raft.Tests
             var persistentState = new PersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = 1, LeaderId = "nodeA", PrevLogIndex = 3, PrevLogTerm = 2, Term = 2 };
-            var res = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest);
+            ManualResetEvent applied=new ManualResetEvent(false);
+            int counter =0;
+            var res = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest, i => { if (++counter == 2) applied.Set(); },doNotDisposeNode:true);
             var response = res.Item1;
-            var node = res.Item2;
-            Assert.That(response.Success, Is.True, "Successful response was not sent for request");
-            Assert.That(node.CommitIndex, Is.EqualTo(1), "Log entries were not commited");
-            Assert.That(node.LastApplied, Is.EqualTo(1), "Log entries were not commited");
+            using (var node = res.Item2)
+            {
+                Assert.That(response.Success, Is.True, "Successful response was not sent for request");
+                Assert.That(node.CommitIndex, Is.EqualTo(1), "Log entries were not commited");
+
+                Assert.That(counter, Is.EqualTo(2), "Not all commited log entries were applied to state machine");
+                Assert.That(applied.WaitOne(1000), Is.True, "Commited log entries were applied to state machine");
+                Assert.That(node.LastApplied, Is.EqualTo(1), "LastApplied is wrong");
+            }
         }
 
-        private Tuple<AppendEntriesResponse, Node<int>> createFollowerAndHandleAppendEntriesRequest(PersistentState<int> persistentState, AppendEntriesRequest<int> appendEntriesRequest, Action<int> apply=null)
+        private Tuple<AppendEntriesResponse, Node<int>> createFollowerAndHandleAppendEntriesRequest(PersistentState<int> persistentState, AppendEntriesRequest<int> appendEntriesRequest, Action<int> apply=null, bool doNotDisposeNode=false)
         {
             apply = apply ?? (i => { }); 
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodaA", "nodaB") { ElectionTimeout = 100000 };
@@ -83,7 +90,8 @@ namespace Inceptum.Raft.Tests
             Action<string, string, AppendEntriesResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
             var transport = mockTransport();
             transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
-            using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine);
+            using (doNotDisposeNode?ActionDisposable.Create(() => { }):node)
             {
                 node.Start();
                 node.Handle(appendEntriesRequest);
