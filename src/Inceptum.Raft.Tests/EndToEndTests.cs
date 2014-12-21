@@ -68,7 +68,7 @@ namespace Inceptum.Raft.Tests
         }
 
         [Test]
-        public void CommandApplyAwaitsForStateMachineToProcessCoommandTest()
+        public void CommandApplyAwaitsForStateMachineToProcessCommandTest()
         {
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
