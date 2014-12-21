@@ -81,6 +81,7 @@ namespace Inceptum.Raft
             get { return m_State.EnterTime; }
         }
 
+       
         public Node(PersistentState<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
         {
             m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
