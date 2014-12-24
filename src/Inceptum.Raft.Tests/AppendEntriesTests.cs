@@ -73,8 +73,8 @@ namespace Inceptum.Raft.Tests
                 Assert.That(response.Success, Is.True, "Successful response was not sent for request");
                 Assert.That(node.CommitIndex, Is.EqualTo(1), "Log entries were not commited");
 
-                Assert.That(counter, Is.EqualTo(2), "Not all commited log entries were applied to state machine");
-                Assert.That(applied.WaitOne(1000), Is.True, "Commited log entries were applied to state machine");
+                Assert.That(applied.WaitOne(1000), Is.True, "Commited log entries were not applied to state machine");
+                Assert.That(counter, Is.EqualTo(2), "Not all commited log entries were not applied to state machine");
                 Assert.That(node.LastApplied, Is.EqualTo(1), "LastApplied is wrong");
             }
         }
