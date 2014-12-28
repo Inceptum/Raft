@@ -233,6 +233,11 @@ namespace Inceptum.Raft
 
         internal void Handle(AppendEntriesRequest<TCommand> request)
         {
+            if (!Configuration.KnownNodes.Contains(request.LeaderId))
+            {
+                Log("Got AppendEntriesRequest from unknown node {0}. Ignoring...",   request.LeaderId);
+                return;
+            }
             ResetTimeout();
 
             if (request.Term > PersistentState.CurrentTerm)
@@ -255,6 +260,11 @@ namespace Inceptum.Raft
 
         internal void Handle(AppendEntriesResponse response)
         {
+            if (!Configuration.KnownNodes.Contains(response.NodeId))
+            {
+                Log("Got AppendEntriesResponse from unknown node {0}. Ignoring...", response.NodeId);
+                return;
+            }
             if (response.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, response.Term, response.NodeId);
@@ -268,6 +278,11 @@ namespace Inceptum.Raft
 
         internal void Handle(VoteRequest voteRequest)
         {
+            if (!Configuration.KnownNodes.Contains(voteRequest.CandidateId))
+            {
+                Log("Got VoteRequest from unknown node {0}. Ignoring...", voteRequest.CandidateId);
+                return;
+            }
             if (voteRequest.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, voteRequest.Term, voteRequest.CandidateId);
@@ -293,6 +308,12 @@ namespace Inceptum.Raft
 
         internal void Handle(VoteResponse vote)
         {
+            if (!Configuration.KnownNodes.Contains(vote.NodeId))
+            {
+                Log("Got VoteResponse from unknown node {0}. Ignoring...", vote.NodeId);
+                return;
+            }
+
             if (vote.Term > PersistentState.CurrentTerm)
             {
                 Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, vote.Term, vote.NodeId);

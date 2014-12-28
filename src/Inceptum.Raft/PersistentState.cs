@@ -102,7 +102,7 @@ namespace Inceptum.Raft
 
         public IEnumerable<ILogEntry<TCommand>> GetRange(int index, int entriesCount)
         {
-            return m_Log.GetRange(index, entriesCount);
+            return   m_Log.GetRange(index, entriesCount);
         }
     }
 }

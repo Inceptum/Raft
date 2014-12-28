@@ -12,7 +12,7 @@ namespace Inceptum.Raft.Tests
         [Test]
         public void NodeStartsAsFollowerTest()
         {
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodaA", "nodaB") { ElectionTimeout = 10000 };
+            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 10000 };
             var transport = mockTransport();
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             using (var node = new Node<int>(new PersistentState<int>(), nodeConfiguration, transport, stateMachine))
@@ -30,19 +30,19 @@ namespace Inceptum.Raft.Tests
             {
                 node.Start();
                 node.SwitchToLeader();
-                node.Handle(new AppendEntriesRequest<int>() { Term = 1 });
+                node.Handle(new AppendEntriesRequest<int>() { Term = 1 ,LeaderId = "nodeA"});
                 Assert.That(node.CurrentTerm, Is.EqualTo(1), "Term was not updated from AppendEntriesRequest");
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Has not converted to Follower on AppendEntriesRequest with newer term");
                 node.SwitchToLeader();
-                node.Handle(new AppendEntriesResponse { Term = 2 });
+                node.Handle(new AppendEntriesResponse { Term = 2,NodeId = "nodeA"});
                 Assert.That(node.CurrentTerm, Is.EqualTo(2), "Term was not updated from AppendEntriesResponse");
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Has not converted to Follower on AppendEntriesResponse with newer term");
                 node.SwitchToLeader();
-                node.Handle(new VoteRequest { Term = 3 });
+                node.Handle(new VoteRequest { Term = 3, CandidateId = "nodeA" });
                 Assert.That(node.CurrentTerm, Is.EqualTo(3), "Term was not updated from VoteRequest");
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Has not converted to Follower on VoteRequest with newer term");
                 node.SwitchToLeader();
-                node.Handle(new VoteResponse{ Term = 4 });
+                node.Handle(new VoteResponse { Term = 4, NodeId = "nodeA" });
                 Assert.That(node.CurrentTerm, Is.EqualTo(4), "Term was not updated from VoteResponse");
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Has not converted to Follower on VoteResponse with newer term");
             }
@@ -50,7 +50,7 @@ namespace Inceptum.Raft.Tests
 
         private Node<int> createFollower(PersistentState<int> persistentState)
         {
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodaA", "nodaB") { ElectionTimeout = 100000 };
+            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
             return new Node<int>(persistentState, nodeConfiguration, transport, stateMachine);

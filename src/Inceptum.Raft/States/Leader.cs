@@ -135,7 +135,8 @@ namespace Inceptum.Raft.States
             }
             else
             {
-                NextIndexes[node]--;
+                if (NextIndexes[node]>0)
+                    NextIndexes[node]--;
             }
 
         }
