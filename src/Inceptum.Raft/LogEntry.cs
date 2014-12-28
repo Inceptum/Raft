@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Inceptum.Raft
 {
-    class LogEntry<TCommand> : ILogEntry<TCommand>
+    public class LogEntry<TCommand> : ILogEntry<TCommand>
     {
         public long Term { get; private set; }
         public TCommand Command { get; private set; }

@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="ActionDisposable.cs" />
     <Compile Include="IStateMachine.cs" />
+    <Compile Include="IStatePersister.cs" />
     <Compile Include="SingleThreadTaskScheduler.cs" />
     <Compile Include="InMemoryTransport.cs" />
     <Compile Include="ITransport.cs" />
