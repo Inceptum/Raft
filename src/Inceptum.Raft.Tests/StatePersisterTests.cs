@@ -6,7 +6,7 @@ using NUnit.Framework;
 namespace Inceptum.Raft.Tests
 {
     [TestFixture]
-    public class StatePersisterTests
+    public class FilePersistentStateTests
     {
         [Test]
         public void LogPersistenceTest()
@@ -19,24 +19,24 @@ namespace Inceptum.Raft.Tests
 
 
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                persister.Append(new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3));
+                persistentState.Append(new []{new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3)});
             }
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                Assert.That(persister.GetLog(), Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3) }),"Log was not restored correctly");
+                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3) }),"Log was not restored correctly");
             }
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                persister.RemoveAfter(1);
+                persistentState.DeleteEntriesAfter(1);
             }
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                Assert.That(persister.GetLog(), Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)}), "Truncated log was not restored correctly");
+                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)}), "Truncated log was not restored correctly");
             }
 
         }
@@ -51,16 +51,16 @@ namespace Inceptum.Raft.Tests
 
 
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                persister.SaveState(10,"some node");
+                persistentState.CurrentTerm=10;
+                persistentState.VotedFor="some node";
             }
 
-            using (var persister = new StatePersister<int>(tempPath))
+            using (var persistentState = new FilePersistentState<int>(tempPath))
             {
-                var state = persister.GetState();
-                Assert.That(state.Item1, Is.EqualTo(10),"Term was not restored correctly");
-                Assert.That(state.Item2, Is.EqualTo("some node"), "Term was not restored correctly");
+                Assert.That(persistentState.CurrentTerm, Is.EqualTo(10), "Term was not restored correctly");
+                Assert.That(persistentState.VotedFor, Is.EqualTo("some node"), "Term was not restored correctly");
             }
              
         }

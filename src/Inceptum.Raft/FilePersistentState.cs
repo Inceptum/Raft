@@ -5,14 +5,14 @@ using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Inceptum.Raft
 {
-    public class StatePersister<TCommand> : IStatePersister<TCommand>,IDisposable
+    public class FilePersistentState<TCommand> : PersistentStateBase<TCommand>,IDisposable
     {
         readonly Dictionary<long,long> m_Map=new Dictionary<long, long>();
         private readonly BinaryFormatter m_Formatter;
         private readonly FileStream m_LogFileStream;
         private readonly FileStream m_StateFileStream;
 
-        public StatePersister(string path)
+        public FilePersistentState(string path)
         {
             var diretory = Path.GetFullPath(path);
             if (Directory.Exists(diretory))
@@ -33,22 +33,23 @@ namespace Inceptum.Raft
             }
         }
 
-        public Tuple<long, string> GetState()
+        protected override Tuple<long, string> LoadState()
         {
             m_StateFileStream.Seek(0, SeekOrigin.Begin);
             return (Tuple<long, string>)m_Formatter.Deserialize(m_StateFileStream);
         }
 
-        public void SaveState(long term, string votedFor)
+        protected override sealed void SaveState(long currentTerm, string votedFor)
         {
             m_StateFileStream.SetLength(0);
-            m_Formatter.Serialize(m_StateFileStream, Tuple.Create(term,votedFor));
+            m_Formatter.Serialize(m_StateFileStream, Tuple.Create(currentTerm, votedFor));
             m_StateFileStream.Flush();
         }
 
-        public void Append(params ILogEntry<TCommand>[] entries)
+        protected override void AppendLog(params LogEntry<TCommand>[] logEntries)
         {
-            foreach (var logEntry in entries)
+            m_LogFileStream.Seek(0, SeekOrigin.End);
+            foreach (var logEntry in logEntries)
             {
                 m_Formatter.Serialize(m_LogFileStream, logEntry);   
                 m_Map.Add(m_Map.Count,m_LogFileStream.Position);
@@ -56,7 +57,7 @@ namespace Inceptum.Raft
             m_LogFileStream.Flush();
         }
 
-        public IEnumerable<ILogEntry<TCommand>> GetLog()
+        protected override IEnumerable<ILogEntry<TCommand>> LoadLog()
         {
             try
             {
@@ -72,7 +73,7 @@ namespace Inceptum.Raft
             }
         }
 
-        public void RemoveAfter(int index)
+        protected override void RemoveLogAfter(int index)
         {
             m_LogFileStream.SetLength(m_Map[index]);
         }

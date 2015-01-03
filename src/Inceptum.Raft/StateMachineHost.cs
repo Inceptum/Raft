@@ -9,14 +9,14 @@ namespace Inceptum.Raft
         private readonly SingleThreadTaskScheduler m_StateMachineScheduler;
         private long m_LastApplied;
         private readonly IStateMachine<TCommand> m_StateMachine;
-        private PersistentState<TCommand> m_PersistentState;
+        private readonly PersistentStateBase<TCommand> m_PersistentState;
 
         public long LastApplied
         {
             get { return Interlocked.Read(ref m_LastApplied); }
         }
 
-        public StateMachineHost(IStateMachine<TCommand> stateMachine, string nodeId, PersistentState<TCommand> persistentState)
+        public StateMachineHost(IStateMachine<TCommand> stateMachine, string nodeId, PersistentStateBase<TCommand> persistentState)
         {
             m_PersistentState = persistentState;
             m_LastApplied = -1;
@@ -26,6 +26,7 @@ namespace Inceptum.Raft
 
         public int Apply(int startIndex,int endIndex)
         {
+            //TODO: exception handling. Crashed command processing should crash the node (https://groups.google.com/forum/#!searchin/raft-dev/state$20machinhe$20fault/raft-dev/6BauqBX6yEs/W6pZFdKcLckJ)
             //TODO: index should be long
             var processedIndex = startIndex - 1;
             for (var i = startIndex; i <= Math.Min(endIndex, m_PersistentState.Log.Count - 1); i++)
@@ -42,7 +43,5 @@ namespace Inceptum.Raft
             }
             return processedIndex;
         }
-
-
     }
 }

@@ -38,7 +38,7 @@ namespace TestConsoleApplication
 
                 var nodes = knownNodes.Select(
                     id =>
-                        new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                        new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
                             inMemoryTransport, new StateMachine()))
                     .ToArray();
 

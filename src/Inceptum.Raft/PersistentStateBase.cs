@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -8,10 +9,11 @@ namespace Inceptum.Raft
     /// <summary>
     /// Raft node persistent state
     /// </summary>
-    public class PersistentState<TCommand>
+    public abstract class PersistentStateBase<TCommand>
     {
         private long m_CurrentTerm;
         private readonly List<ILogEntry<TCommand>> m_Log;
+        private string m_VotedFor;
 
         /// <summary>
         /// Gets or sets the current term.
@@ -29,7 +31,8 @@ namespace Inceptum.Raft
                     return;
                 }
 
-                VotedFor = null;
+                SaveState(value, null);
+                m_VotedFor = null;
                 m_CurrentTerm = value;
             }
         }
@@ -40,7 +43,15 @@ namespace Inceptum.Raft
         /// <value>
         /// The candidateId voted for.
         /// </value>
-        public string VotedFor { get; set; }
+        public string VotedFor
+        {
+            get { return m_VotedFor; }
+            set
+            {
+                SaveState(m_CurrentTerm, value);
+                m_VotedFor = value;
+            }
+        }
 
         /// <summary>
         /// Gets log entries; 
@@ -54,10 +65,14 @@ namespace Inceptum.Raft
             get { return new ReadOnlyCollection<ILogEntry<TCommand>>(m_Log); }
         }
 
-        public PersistentState()
+        protected PersistentStateBase()
         {
-            m_Log = new List<ILogEntry<TCommand>>();
+            m_Log = new List<ILogEntry<TCommand>>(LoadLog());
+            var  state=LoadState();
+            m_CurrentTerm = state.Item1;
+            m_VotedFor = state.Item2;
         }
+
 
         public bool EntryTermMatches(int prevLogIndex, long prevLogTerm)
         {
@@ -75,19 +90,22 @@ namespace Inceptum.Raft
             var index = prevLogIndex + 1;
             if (index >= m_Log.Count) 
                 return false;
+            RemoveLogAfter(index);
             m_Log.RemoveRange(index, m_Log.Count - index);
             return true;
         }
 
-
         public void Append(IEnumerable<ILogEntry<TCommand>> entries)
         {
-            m_Log.AddRange(entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)));
+            var logEntries = entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)).ToArray();
+            AppendLog(logEntries);
+            m_Log.AddRange(logEntries);
         }
 
         public TaskCompletionSource<object> Append(TCommand command)
         {
             var logEntry = new LogEntry<TCommand>(CurrentTerm, command);
+            AppendLog(logEntry);
             m_Log.Add(logEntry);
             return logEntry.Completion;
         }
@@ -104,5 +122,14 @@ namespace Inceptum.Raft
         {
             return   m_Log.GetRange(index, entriesCount);
         }
+
+
+
+        protected abstract Tuple<long, string> LoadState();
+        protected abstract void SaveState(long currentTerm, string votedFor);
+        protected abstract IEnumerable<ILogEntry<TCommand>> LoadLog();
+        protected abstract void RemoveLogAfter(int index);
+        protected abstract void AppendLog(params LogEntry<TCommand>[] logEntries);
+
     }
 }

@@ -14,7 +14,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "Reply false if term < currentTerm")]
         public void ReplyFalseIfTermIsOlderTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 2 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 2 };
             var voteRequest = new VoteRequest
             {
                 CandidateId = "nodeA",
@@ -30,7 +30,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)")]
         public void DoNotVoteForCandidatesWithOutdatedLogTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(new [] {new LogEntry<int>(1, 1)});
             var voteRequest = new VoteRequest
             {
@@ -47,7 +47,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)")]
         public void SuccessfulVoteTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var voteRequest = new VoteRequest
             {
                 CandidateId = "nodeA",
@@ -63,7 +63,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If votedFor is null or candidateId, and candidate’s log is at least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)")]
         public void VoteOnlyForOneCandidateWithinTermTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var voteRequests = new[]{ new VoteRequest
             {
                 CandidateId = "nodeA",
@@ -87,7 +87,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "On conversion to candidate, start election:Increment currentTerm, Vote for self, Send RequestVote RPCs to all other servers")]
         public void FollowerSwitchToCandidateTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -105,7 +105,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If votes received from majority of servers: become leader")]
         public void CandidateSwitchToLeaderTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -121,7 +121,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If AppendEntries RPC received from new leader: candidate converts to follower")]
         public void SwitchToFollowerFromCandidateOnAppendEntriesTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -141,7 +141,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If election timeout elapses: candidate starts new election")]
         public void IfElectionTimeoutElapsesCandidateStartsNewElectionTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -157,7 +157,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If election timeout elapses without receiving AppendEntries RPC from current leader or granting vote to candidate: convert to candidate")]
         public void IfElectionTimeoutElapsesFollowerConvertsToCandidateTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -169,7 +169,7 @@ namespace Inceptum.Raft.Tests
             }
         }
 
-        private static IEnumerable<VoteResponse> createFollowerAndHandleVoteRequest(PersistentState<int> persistentState,params VoteRequest[] voteRequests)
+        private static IEnumerable<VoteResponse> createFollowerAndHandleVoteRequest(InMemoryPersistentState<int> persistentState,params VoteRequest[] voteRequests)
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();

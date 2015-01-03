@@ -47,7 +47,7 @@ namespace Inceptum.Raft.Tests
             Node<object>.m_Log.Clear();
             var inMemoryTransport = new InMemoryTransport();
             var nodes = m_KnownNodes.Select(
-                id => new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, inMemoryTransport,new StateMachine()))
+                id => new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, inMemoryTransport,new StateMachine()))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -77,7 +77,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
+                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
                         inMemoryTransport, stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
@@ -107,7 +107,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k=>k,v=>new StateMachine());
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
+                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
                         inMemoryTransport, stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
@@ -158,7 +158,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new PersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
                         inMemoryTransport, stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());

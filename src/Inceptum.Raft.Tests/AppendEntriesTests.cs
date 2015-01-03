@@ -14,7 +14,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "Reply false if term < currentTerm (§5.1)")]
         public void NodeRepliesFalseIfThereIsNoOnAppendEntriesWithOlderTermTestt()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 10 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 10 };
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = -1, PrevLogTerm = -1, Term = 1 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.False, "Successful response was sent for request with old term");
@@ -24,7 +24,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)")]
         public void NodeRepliesFalseOnAppendEntriesIfDoesNotHaveLogEntryAtPrevLogIndexMatchingPrevLogTermTes()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 2 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 2 };
             persistentState.Append(new[] { new LogEntry<int>(2, 2), });
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
@@ -35,7 +35,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)")]
         public void ConflictingLogRemoveTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) });
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 0, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
@@ -49,7 +49,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "Append any new entries not already in the log")]
         public void AppendAnyNewEntriesNotAlredyInLogTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) });
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[] { new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) }, LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
@@ -62,7 +62,7 @@ namespace Inceptum.Raft.Tests
         public void CommitUpToLeaderCommitIndexTest()
         {
             var logEntries = new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) };
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = 1, LeaderId = "nodeA", PrevLogIndex = 3, PrevLogTerm = 2, Term = 2 };
             ManualResetEvent applied=new ManualResetEvent(false);
@@ -84,7 +84,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "Upon election: Leader sends initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts")]
         public void LeaderHbTest()
         {
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var transport = mockTransport();
@@ -103,7 +103,7 @@ namespace Inceptum.Raft.Tests
         public void LogReplicationTest()
         {
             var logEntries = new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)  };
-            var persistentState = new PersistentState<int> { CurrentTerm = 1 };
+            var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             //TODO: send AppendEntriesRequest immediately on not success response
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100  };
@@ -145,7 +145,7 @@ namespace Inceptum.Raft.Tests
             }
         }
 
-        private Tuple<AppendEntriesResponse, Node<int>> createFollowerAndHandleAppendEntriesRequest(PersistentState<int> persistentState, AppendEntriesRequest<int> appendEntriesRequest, Action<int> apply=null, bool doNotDisposeNode=false)
+        private Tuple<AppendEntriesResponse, Node<int>> createFollowerAndHandleAppendEntriesRequest(InMemoryPersistentState<int> persistentState, AppendEntriesRequest<int> appendEntriesRequest, Action<int> apply=null, bool doNotDisposeNode=false)
         {
             apply = apply ?? (i => { }); 
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };

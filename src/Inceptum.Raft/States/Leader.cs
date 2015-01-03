@@ -45,7 +45,9 @@ namespace Inceptum.Raft.States
                 LastSentIndex[node] = -1;
             }
             Node.ResetTimeout();
-            Timeout();
+            Node.Log("I AM THE LEADER!!!!! Sending HB");
+            //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
+            appendEntries();
             base.Enter();
         }
 
@@ -67,6 +69,8 @@ namespace Inceptum.Raft.States
             //TODO: proxy to leader
             appendEntries();
             Node.ResetTimeout();
+
+            //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
             return completion.Task;
         }
 
@@ -98,8 +102,6 @@ namespace Inceptum.Raft.States
             }
         }
 
-        //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
-
         public override bool Handle(VoteRequest voteRequest)
         {
             //Since state is not sitched to follower, term is older or same - decline
@@ -115,7 +117,6 @@ namespace Inceptum.Raft.States
         public override void Handle( AppendEntriesResponse response)
         {
             var node = response.NodeId;
-            //TODO: If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4)
             if (response.Success)
             {
                 MatchIndex[node] = LastSentIndex[node];
@@ -123,6 +124,7 @@ namespace Inceptum.Raft.States
                 if (!Node.PersistentState.Log.Any()) 
                     return;
 
+                //If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4)
                 for (var i = Node.CommitIndex+1; i <= MatchIndex.Values.Max(); i++)
                 {
                     if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Configuration.Majority &&

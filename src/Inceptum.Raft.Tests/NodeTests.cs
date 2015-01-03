@@ -15,7 +15,7 @@ namespace Inceptum.Raft.Tests
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 10000 };
             var transport = mockTransport();
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            using (var node = new Node<int>(new PersistentState<int>(), nodeConfiguration, transport, stateMachine))
+            using (var node = new Node<int>(new InMemoryPersistentState<int>(), nodeConfiguration, transport, stateMachine))
             {
                 node.Start();
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Node state after start is not follower");
@@ -26,7 +26,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)")]
         public void UpdateTermFromIncommingMessagesTest()
         {
-            using (var node = createFollower(new PersistentState<int>(){CurrentTerm = 0}))
+            using (var node = createFollower(new InMemoryPersistentState<int>(){CurrentTerm = 0}))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -48,7 +48,7 @@ namespace Inceptum.Raft.Tests
             }
         }
 
-        private Node<int> createFollower(PersistentState<int> persistentState)
+        private Node<int> createFollower(InMemoryPersistentState<int> persistentState)
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();

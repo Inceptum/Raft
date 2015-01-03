@@ -16,10 +16,10 @@ namespace Inceptum.Raft.Rpc
         public long Term { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether tthe follower contained entry matching prevLogIndex and prevLogTerm.
+        /// Gets or sets a value indicating whether the follower contained entry matching prevLogIndex and prevLogTerm.
         /// </summary>
         /// <value>
-        ///   <c>true</c> if ollower contained entry matching prevLogIndex and prevLogTerm; otherwise, <c>false</c>.
+        ///   <c>true</c> if follower contained entry matching prevLogIndex and prevLogTerm; otherwise, <c>false</c>.
         /// </value>
         public bool Success { get; set; }
 
