@@ -1,22 +1,27 @@
 using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Inceptum.Raft
 {
+    [Serializable]
     public class LogEntry<TCommand> : ILogEntry<TCommand>
     {
+        [NonSerialized]
+        private readonly TaskCompletionSource<object> m_Completion;
         public long Term { get; private set; }
         public TCommand Command { get; private set; }
         public LogEntry(long term, TCommand command)
         {
             Term = term;
             Command = command;
-            Completion=new TaskCompletionSource<object>();
+            m_Completion=new TaskCompletionSource<object>();
         }
-        
-        public TaskCompletionSource<object> Completion { get; private set; }
+
+        public TaskCompletionSource<object> Completion
+        {
+            get { return m_Completion; }
+        }
 
         protected bool Equals(LogEntry<TCommand> other)
         {
