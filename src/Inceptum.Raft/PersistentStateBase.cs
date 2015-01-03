@@ -12,7 +12,7 @@ namespace Inceptum.Raft
     public abstract class PersistentStateBase<TCommand>
     {
         private long m_CurrentTerm;
-        private readonly List<ILogEntry<TCommand>> m_Log;
+        private readonly List<LogEntry<TCommand>> m_Log;
         private string m_VotedFor;
 
         /// <summary>
@@ -60,14 +60,14 @@ namespace Inceptum.Raft
         /// <value>
         /// The log.
         /// </value>
-        public IList<ILogEntry<TCommand>> Log
+        public IList<LogEntry<TCommand>> Log
         {
-            get { return new ReadOnlyCollection<ILogEntry<TCommand>>(m_Log); }
+            get { return new ReadOnlyCollection<LogEntry<TCommand>>(m_Log); }
         }
 
         protected PersistentStateBase()
         {
-            m_Log = new List<ILogEntry<TCommand>>(LoadLog());
+            m_Log = new List<LogEntry<TCommand>>(LoadLog());
             var  state=LoadState();
             m_CurrentTerm = state.Item1;
             m_VotedFor = state.Item2;
@@ -95,7 +95,7 @@ namespace Inceptum.Raft
             return true;
         }
 
-        public void Append(IEnumerable<ILogEntry<TCommand>> entries)
+        public void Append(IEnumerable<LogEntry<TCommand>> entries)
         {
             var logEntries = entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)).ToArray();
             AppendLog(logEntries);
@@ -118,7 +118,7 @@ namespace Inceptum.Raft
             return lastEntry.Term < lastLogTerm || (lastEntry.Term == lastLogTerm && lastLogIndex >= m_Log.Count - 1);
         }
 
-        public IEnumerable<ILogEntry<TCommand>> GetRange(int index, int entriesCount)
+        public IEnumerable<LogEntry<TCommand>> GetRange(int index, int entriesCount)
         {
             return   m_Log.GetRange(index, entriesCount);
         }
@@ -127,7 +127,7 @@ namespace Inceptum.Raft
 
         protected abstract Tuple<long, string> LoadState();
         protected abstract void SaveState(long currentTerm, string votedFor);
-        protected abstract IEnumerable<ILogEntry<TCommand>> LoadLog();
+        protected abstract IEnumerable<LogEntry<TCommand>> LoadLog();
         protected abstract void RemoveLogAfter(int index);
         protected abstract void AppendLog(params LogEntry<TCommand>[] logEntries);
 

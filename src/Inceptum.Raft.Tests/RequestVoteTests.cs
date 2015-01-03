@@ -129,7 +129,7 @@ namespace Inceptum.Raft.Tests
             {
                 node.Start();
                 node.SwitchToCandidate();
-                var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = -1, PrevLogTerm = -1, Term = 2 };
+                var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = -1, PrevLogTerm = -1, Term = 2 };
 
                 node.Handle(appendEntriesRequest);
                 Assert.That(node.CurrentTerm,Is.EqualTo(2),"Term was not incremented");

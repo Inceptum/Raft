@@ -15,7 +15,7 @@ namespace Inceptum.Raft.Tests
         public void NodeRepliesFalseIfThereIsNoOnAppendEntriesWithOlderTermTestt()
         {
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 10 };
-            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = -1, PrevLogTerm = -1, Term = 1 };
+            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = -1, PrevLogTerm = -1, Term = 1 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.False, "Successful response was sent for request with old term");
         }
@@ -26,7 +26,7 @@ namespace Inceptum.Raft.Tests
         {
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 2 };
             persistentState.Append(new[] { new LogEntry<int>(2, 2), });
-            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
+            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.False, "Successful response was sent for request with missing log entries");
         }
@@ -37,11 +37,11 @@ namespace Inceptum.Raft.Tests
         {
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) });
-            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 0, PrevLogTerm = 1, Term = 2 };
+            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 0, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.True, "Successful response was not sent for request");
             Assert.That(persistentState.CurrentTerm, Is.EqualTo(2), "Term was not updated to received from leader");
-            Assert.That(persistentState.Log, Is.EqualTo(new ILogEntry<int>[] { new LogEntry<int>(1, 1) }), "Conflicting log entries were not removed");
+            Assert.That(persistentState.Log, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1) }), "Conflicting log entries were not removed");
 
         }
 
@@ -51,17 +51,17 @@ namespace Inceptum.Raft.Tests
         {
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) });
-            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new ILogEntry<int>[] { new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) }, LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
+            var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[] { new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) }, LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.True, "Successful response was not sent for request");
             Assert.That(persistentState.CurrentTerm, Is.EqualTo(2), "Term was not updated to received from leader");
-            Assert.That(persistentState.Log, Is.EqualTo(new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) }), "Log entries were not appended");
+            Assert.That(persistentState.Log, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) }), "Log entries were not appended");
         }
 
         [Test(Description = "Append any new entries not already in the log")]
         public void CommitUpToLeaderCommitIndexTest()
         {
-            var logEntries = new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) };
+            var logEntries = new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(1, 3), new LogEntry<int>(2, 4) };
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             var appendEntriesRequest = new AppendEntriesRequest<int> { Entries = new LogEntry<int>[0], LeaderCommit = 1, LeaderId = "nodeA", PrevLogIndex = 3, PrevLogTerm = 2, Term = 2 };
@@ -102,7 +102,7 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If last log index ≥ nextIndex for a follower: send AppendEntries RPC with log entries starting at nextIndex")]
         public void LogReplicationTest()
         {
-            var logEntries = new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)  };
+            var logEntries = new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)  };
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             //TODO: send AppendEntriesRequest immediately on not success response
@@ -137,10 +137,10 @@ namespace Inceptum.Raft.Tests
                 node.SwitchToLeader();
                
                 Assert.That(requestSent.WaitOne(2000), "AppendEntriesResponse with reduced index was not sent");
-                Assert.That(requests[0].Entries, Is.EqualTo(new ILogEntry<int>[] { }), "Initial AppendEntriesRequestwas not empty ");
-                Assert.That(requests[1].Entries, Is.EqualTo(new ILogEntry<int>[] { new LogEntry<int>(1, 2) }),"Leader did not repeated last entry when got first unsuccessful response");
-                Assert.That(requests[2].Entries, Is.EqualTo(new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated 2 last entries when got first unsuccessful response");
-                Assert.That(requests[3].Entries, Is.EqualTo(new ILogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated all entries when got more unsuccessful responses then entries count in the log");
+                Assert.That(requests[0].Entries, Is.EqualTo(new LogEntry<int>[] { }), "Initial AppendEntriesRequestwas not empty ");
+                Assert.That(requests[1].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 2) }),"Leader did not repeated last entry when got first unsuccessful response");
+                Assert.That(requests[2].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated 2 last entries when got first unsuccessful response");
+                Assert.That(requests[3].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated all entries when got more unsuccessful responses then entries count in the log");
                 transport.VerifyAllExpectations();//send AppendEntriesRequest to all nodes twice - on election amd after timeout elapsed
             }
         }

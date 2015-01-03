@@ -80,7 +80,7 @@ namespace Inceptum.Raft.States
             {
                 var nextIndex = NextIndexes[node];
 
-                IEnumerable<ILogEntry<TCommand>> logEntries = new ILogEntry<TCommand>[0];
+                IEnumerable<LogEntry<TCommand>> logEntries = new LogEntry<TCommand>[0];
                 if (nextIndex < Node.PersistentState.Log.Count)
                 {
                     var entriesCount = Math.Min(20, Node.PersistentState.Log.Count - nextIndex); //TODO: move batch size to config (20)

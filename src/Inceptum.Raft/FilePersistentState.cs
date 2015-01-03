@@ -57,14 +57,14 @@ namespace Inceptum.Raft
             m_LogFileStream.Flush();
         }
 
-        protected override IEnumerable<ILogEntry<TCommand>> LoadLog()
+        protected override IEnumerable<LogEntry<TCommand>> LoadLog()
         {
             try
             {
                 m_LogFileStream.Seek(0, SeekOrigin.Begin);
                 while (m_LogFileStream.Position != m_LogFileStream.Length)
                 {
-                    yield return (ILogEntry<TCommand>) m_Formatter.Deserialize(m_LogFileStream);
+                    yield return (LogEntry<TCommand>) m_Formatter.Deserialize(m_LogFileStream);
                 }
             }
             finally

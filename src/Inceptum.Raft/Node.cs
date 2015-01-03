@@ -74,8 +74,8 @@ namespace Inceptum.Raft
         {
             get { return PersistentState.CurrentTerm; }
         }
-       
-        public IEnumerable<ILogEntry<TCommand>> LogEntries
+
+        public IEnumerable<LogEntry<TCommand>> LogEntries
         {
             get { return PersistentState.Log; }
         }

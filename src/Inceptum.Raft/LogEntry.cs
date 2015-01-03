@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace Inceptum.Raft
 {
     [Serializable]
-    public class LogEntry<TCommand> : ILogEntry<TCommand>
+    public class LogEntry<TCommand>  
     {
         [NonSerialized]
         private readonly TaskCompletionSource<object> m_Completion;

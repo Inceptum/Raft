@@ -52,7 +52,6 @@
     <Compile Include="Rpc\AppendEntriesRequest.cs" />
     <Compile Include="States\Candidate.cs" />
     <Compile Include="States\Follower.cs" />
-    <Compile Include="ILogEntry.cs" />
     <Compile Include="INodeState.cs" />
     <Compile Include="States\Leader.cs" />
     <Compile Include="LogEntry.cs" />

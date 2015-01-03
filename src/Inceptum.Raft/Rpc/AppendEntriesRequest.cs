@@ -46,7 +46,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The entries.
         /// </value>
-        public IEnumerable<ILogEntry<TCommand>> Entries { get; set; }
+        public IEnumerable<LogEntry<TCommand>> Entries { get; set; }
 
         /// <summary>
         /// Gets or sets the leader’s commit index.

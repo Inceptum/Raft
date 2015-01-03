@@ -15,9 +15,9 @@ namespace Inceptum.Raft
             
         }
 
-        protected override IEnumerable<ILogEntry<TCommand>> LoadLog()
+        protected override IEnumerable<LogEntry<TCommand>> LoadLog()
         {
-            return new ILogEntry<TCommand>[0];
+            return new LogEntry<TCommand>[0];
         }
 
         protected override void RemoveLogAfter(int index)
