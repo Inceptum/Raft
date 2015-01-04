@@ -70,6 +70,7 @@ namespace Inceptum.Raft.Tests
         [Test]
         public void CommandApplyAwaitsForStateMachineToProcessCommandTest()
         {
+            //TDOD: not sture if it is right logic - SM holds state in memory , so it makes no sence to finish command processing on dispose since SM would be disposed right after it and state would be lost
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
             var inMemoryTransport = new InMemoryTransport();

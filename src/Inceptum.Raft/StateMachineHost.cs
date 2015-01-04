@@ -26,7 +26,7 @@ namespace Inceptum.Raft
 
         public int Apply(int startIndex,int endIndex)
         {
-            //TODO: exception handling. Crashed command processing should crash the node (https://groups.google.com/forum/#!searchin/raft-dev/state$20machinhe$20fault/raft-dev/6BauqBX6yEs/W6pZFdKcLckJ)
+            //TODO: exception handling. Crashed command processing should restart the node (https://groups.google.com/forum/#!searchin/raft-dev/state$20machinhe$20fault/raft-dev/6BauqBX6yEs/W6pZFdKcLckJ)
             //TODO: index should be long
             var processedIndex = startIndex - 1;
             for (var i = startIndex; i <= Math.Min(endIndex, m_PersistentState.Log.Count - 1); i++)
