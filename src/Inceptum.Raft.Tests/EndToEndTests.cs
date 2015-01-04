@@ -91,7 +91,7 @@ namespace Inceptum.Raft.Tests
                 exited.Set();
             });
             Assert.That(exited.WaitOne(500),Is.False);
-            canApply[leader.Id].Set();
+            nodes.ForEach(n => canApply[n.Id].Set());
             Assert.That(exited.WaitOne(500), Is.True);
 
             nodes.ForEach(n => n.Dispose());
