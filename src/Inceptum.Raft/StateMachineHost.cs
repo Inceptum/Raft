@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Inceptum.Raft
 {
-    public class StateMachineHost<TCommand>
+    public class StateMachineHost<TCommand>:IDisposable
     {
         private readonly SingleThreadTaskScheduler m_StateMachineScheduler;
         private long m_LastApplied;
@@ -42,6 +42,12 @@ namespace Inceptum.Raft
                 processedIndex = i;
             }
             return processedIndex;
+        }
+
+        public void Dispose()
+        {
+            m_StateMachineScheduler.Wait();
+            m_StateMachineScheduler.Dispose();
         }
     }
 }

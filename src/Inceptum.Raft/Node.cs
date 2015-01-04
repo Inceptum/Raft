@@ -363,6 +363,7 @@ namespace Inceptum.Raft
             m_Stop.Set();
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
+            m_StateMachineHost.Dispose();
         }
 
          private void send<T>(string to, T message)
