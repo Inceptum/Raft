@@ -16,9 +16,11 @@ namespace Inceptum.Raft
         Follower
     }
 
-    //TODO: logging
     //TODO: real world transport
-    //TODO: crashing node on state machine crash
+    //TODO: restart node on state machine crash
+    //TODO: command accepting from clients
+    //TODO: logging
+    //TODO: snapshots
 
     public class Node<TCommand> : IDisposable
     {
