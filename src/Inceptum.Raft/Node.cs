@@ -17,9 +17,9 @@ namespace Inceptum.Raft
     }
 
     //TODO: real world transport
-    //TODO: restart node on state machine crash
     //TODO: command accepting from clients
     //TODO: logging
+    //TODO: restart node on state machine crash
     //TODO: snapshots
 
     public class Node<TCommand> : IDisposable
@@ -179,7 +179,7 @@ namespace Inceptum.Raft
                             }
                             catch (Exception e)
                             {
-                                Log("Failed to process timeout");
+                                Log("Failed to process timeout: {0}",e.ToString());
                             }
                         }
                         break;

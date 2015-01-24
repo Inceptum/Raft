@@ -6,7 +6,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web.Http.SelfHost;
 using Inceptum.Raft;
+using Inceptum.Raft.Http;
 
 namespace TestConsoleApplication
 {
@@ -20,10 +22,20 @@ namespace TestConsoleApplication
     }
     class Program
     {
-        private static  PerformanceCounter m_CpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total"); 
+        private static  PerformanceCounter m_CpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+
         private static void Main(string[] args)
         {
-            Test(150);
+            //   Test(150);
+            string baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9222);
+
+            var config = new HttpSelfHostConfiguration(baseUrl);
+            var server = new HttpSelfHostServer(new HttpTransport().configureHost(config));
+            server.OpenAsync().Wait();
+
+            Console.ReadLine();
+            server.CloseAsync().Wait();
+
         }
 
         private static void Test(int electionTimeout)
@@ -37,9 +49,11 @@ namespace TestConsoleApplication
                 var inMemoryTransport = new InMemoryTransport();
 
                 var nodes = knownNodes.Select(
-                    id =>
-                        new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                            inMemoryTransport, new StateMachine()))
+                    id =>new Node<int>(
+                            new InMemoryPersistentState<int>(), 
+                            new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                            inMemoryTransport, 
+                            new StateMachine()))
                     .ToArray();
 
                 var start = DateTime.Now;

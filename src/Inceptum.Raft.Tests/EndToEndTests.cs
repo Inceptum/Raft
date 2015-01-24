@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -13,7 +9,7 @@ namespace Inceptum.Raft.Tests
 {
     class StateMachine:IStateMachine<int>
     {
-        private Action m_BeforeApply;
+        private readonly Action m_BeforeApply;
 
         public StateMachine():this(() => { })
         {
@@ -155,7 +151,6 @@ namespace Inceptum.Raft.Tests
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
             var inMemoryTransport = new InMemoryTransport();
-            var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
             var nodes = m_KnownNodes.Select(
                 id =>

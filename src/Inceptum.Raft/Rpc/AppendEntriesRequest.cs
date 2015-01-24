@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace Inceptum.Raft.Rpc
 {
@@ -46,6 +47,7 @@ namespace Inceptum.Raft.Rpc
         /// <value>
         /// The entries.
         /// </value>
+        [JsonIgnore]
         public IEnumerable<LogEntry<TCommand>> Entries { get; set; }
 
         /// <summary>
