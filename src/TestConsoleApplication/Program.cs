@@ -30,7 +30,7 @@ namespace TestConsoleApplication
             string baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9222);
 
             var config = new HttpSelfHostConfiguration(baseUrl);
-            var server = new HttpSelfHostServer(new HttpTransport().configureHost(config));
+            var server = new HttpSelfHostServer(new HttpTransport().ConfigureHost(config));
             server.OpenAsync().Wait();
 
             Console.ReadLine();
