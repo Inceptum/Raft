@@ -224,7 +224,15 @@ namespace Inceptum.Raft
 
         internal void AppendEntries(string node, AppendEntriesRequest<TCommand> request)
         {
-            send( node, request);
+            try
+            {
+                m_Transport.Send(node, request);
+            }
+            catch (Exception e)
+            {
+                Log("Failed to send AppendEntriesRequest message  to node {0}: {1} ",  node, e.ToString());
+            }
+            
         }
 
         internal void RequestVotes()
@@ -239,7 +247,14 @@ namespace Inceptum.Raft
 
             foreach (var node in Configuration.KnownNodes)
             {
-                send(node, request);
+                try
+                {
+                    m_Transport.Send(node, request);
+                }
+                catch (Exception e)
+                {
+                    Log("Failed to send VoteRequest message  to node {0}: {1} ", node, e.ToString());
+                }
             }
         }
         internal void Commit(long leaderCommit)
@@ -275,12 +290,20 @@ namespace Inceptum.Raft
                 SwitchToFollower(request.LeaderId);
             }
 
-            send(request.LeaderId, new AppendEntriesResponse
+            try
             {
-                Success = m_State.Handle(request),
-                Term = PersistentState.CurrentTerm,
-                NodeId = Id
-            });
+                m_Transport.Send(request.LeaderId, new AppendEntriesResponse
+                {
+                    Success = m_State.Handle(request),
+                    Term = PersistentState.CurrentTerm,
+                    NodeId = Id
+                });
+            }
+            catch (Exception e)
+            {
+                Log("Failed to send AppendEntriesResponse message  to node {0}: {1} ", request.LeaderId, e.ToString());
+            }
+            
 
         }
 
@@ -323,14 +346,20 @@ namespace Inceptum.Raft
                 PersistentState.VotedFor = voteRequest.CandidateId;
                 ResetTimeout();
             }
-
-            send( voteRequest.CandidateId,
+            try
+            {
+                m_Transport.Send(voteRequest.CandidateId,
                 new VoteResponse
                 {
                     NodeId = Id,
                     Term = PersistentState.CurrentTerm,
                     VoteGranted = granted
                 });
+            }
+            catch (Exception e)
+            {
+                Log("Failed to send VoteResponse message  to node {0}: {1} ", voteRequest.CandidateId, e.ToString());
+            }
         }
 
         internal void Handle(VoteResponse vote)
@@ -364,18 +393,7 @@ namespace Inceptum.Raft
             m_Scheduler.Wait();
             m_StateMachineHost.Dispose();
         }
-
-         private void send<T>(string to, T message)
-        {
-             try
-             {
-                 m_Transport.Send(to,message);
-             }
-             catch (Exception e)
-             {
-                 Log("Failed to send message of type {0} to node {1}: {2} ",typeof(T),to, e.ToString());
-             }
-        }
+ 
 
         public void Log(string format, params object[] args)
         {

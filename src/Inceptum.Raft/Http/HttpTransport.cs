@@ -6,6 +6,7 @@ using System.Web.Http;
 using System.Web.Http.Dispatcher;
 using System.Web.Http.Routing;
 using System.Web.Http.SelfHost;
+using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.Http
 {
@@ -27,14 +28,38 @@ namespace Inceptum.Raft.Http
             handler(message);
         }
 
-        public void Send<T>( string to, T message)
+        public void Send<T>(string to, AppendEntriesRequest<T> message)
         {
-            
+            throw new NotImplementedException();
+        }
+
+        public void Send(string to, AppendEntriesResponse message)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Send(string to, VoteRequest message)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Send(string to, VoteResponse message)
+        {
+            throw new NotImplementedException();
+        }
 /*
+
+        public void Send<T>(string to, T message)
+        {
+            var voteRequest = message as VoteRequest;
+            var request = string.Format("raft/voteRequest?Term={0}&CandidateId={1}&LastLogIndex={2}&LastLogTerm={3}",voteRequest.Term,voteRequest.CandidateId,voteRequest.LastLogIndex,voteRequest.LastLogTerm);
+          
             HttpClient c = new HttpClient();
             c.SendAsync()
-*/
+ 
         }
+*/
+
 
         public IDisposable Subscribe<T>(  Action<T> handler)
         {
@@ -72,7 +97,7 @@ namespace Inceptum.Raft.Http
             config.Services.Replace(typeof(IHttpControllerSelector), new RaftControllerSelector(config, controllerSelector));
 
 
-            config.Routes.MapHttpRoute("RESTVoteRequest", "raft/{action}",
+            var r=config.Routes.MapHttpRoute("RESTVoteRequest", "raft/{action}",
                new { controller = "Raft" },
                new { },
                new RaftRouteHandler { InnerHandler = new HttpControllerDispatcher(config) }

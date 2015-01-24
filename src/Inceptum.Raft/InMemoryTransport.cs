@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Inceptum.Raft;
+using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft
 {
@@ -68,10 +69,25 @@ namespace Inceptum.Raft
             m_Bus = bus ?? m_DefaultBus;
             m_NodeId = nodeId;
         }
-
-        public void Send<T>(string to, T message)
+ 
+        public void Send<T>(string to, AppendEntriesRequest<T> message)
         {
-           m_Bus.Send(m_NodeId,to,message);
+            m_Bus.Send(m_NodeId, to, message);
+        }
+
+        public void Send(string to, AppendEntriesResponse message)
+        {
+            m_Bus.Send(m_NodeId, to, message);
+        }
+
+        public void Send(string to, VoteRequest message)
+        {
+            m_Bus.Send(m_NodeId, to, message);
+        }
+
+        public void Send(string to, VoteResponse message)
+        {
+            m_Bus.Send(m_NodeId, to, message);
         }
 
         public IDisposable Subscribe<T>(Action<T> handler)
