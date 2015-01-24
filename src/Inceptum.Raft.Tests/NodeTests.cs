@@ -13,9 +13,9 @@ namespace Inceptum.Raft.Tests
         public void NodeStartsAsFollowerTest()
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 10000 };
-            var transport = mockTransport();
+            var bus = mockTransport();
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            using (var node = new Node<int>(new InMemoryPersistentState<int>(), nodeConfiguration, transport, stateMachine))
+            using (var node = new Node<int>(new InMemoryPersistentState<int>(), nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Node state after start is not follower");
@@ -52,15 +52,15 @@ namespace Inceptum.Raft.Tests
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-            return new Node<int>(persistentState, nodeConfiguration, transport, stateMachine);
+            var bus = mockTransport();
+            return new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine);
 
         }
-        
 
-        private static ITransport mockTransport()
+
+        private static IInMemoryBus mockTransport()
         {
-            var transport = MockRepository.GenerateMock<ITransport>();
+            var transport = MockRepository.GenerateMock<IInMemoryBus>();
             transport.Expect(t => t.Subscribe<VoteRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<VoteResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesRequest<int>>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));

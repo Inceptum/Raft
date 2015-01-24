@@ -41,9 +41,10 @@ namespace Inceptum.Raft.Tests
         {
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
-            var inMemoryTransport = new InMemoryTransport();
             var nodes = m_KnownNodes.Select(
-                id => new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, inMemoryTransport,new StateMachine()))
+                id => new Node<int>(new InMemoryPersistentState<int>(),
+                                    new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, 
+                                    new InMemoryTransport(id),new StateMachine()))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -69,13 +70,12 @@ namespace Inceptum.Raft.Tests
             //TDOD: not sture if it is right logic - SM holds state in memory , so it makes no sence to finish command processing on dispose since SM would be disposed right after it and state would be lost
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
-            var inMemoryTransport = new InMemoryTransport();
             var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        inMemoryTransport, stateMachines[id]))
+                        new InMemoryTransport(id), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -100,12 +100,12 @@ namespace Inceptum.Raft.Tests
         {
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
-            var inMemoryTransport = new InMemoryTransport();
+            var bus = new InMemoryBus();
             var stateMachines = m_KnownNodes.ToDictionary(k=>k,v=>new StateMachine());
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        inMemoryTransport, stateMachines[id]))
+                        new InMemoryTransport(id, bus), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -113,7 +113,7 @@ namespace Inceptum.Raft.Tests
             Thread.Sleep(electionTimeout*5);
             var follower = nodes.First(n => n.State == NodeState.Follower);
             Console.WriteLine("Failing the follower " + follower.Id);
-            inMemoryTransport.EmulateConnectivityIssue(follower.Id);
+            bus.EmulateConnectivityIssue(follower.Id);
             Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
  
             var exleader = nodes.First(n => n.State == NodeState.Leader);
@@ -125,15 +125,15 @@ namespace Inceptum.Raft.Tests
  
             Thread.Sleep(electionTimeout*10);
             Console.WriteLine("Failing the leader " + exleader.Id);
-            inMemoryTransport.EmulateConnectivityIssue(exleader.Id);
+            bus.EmulateConnectivityIssue(exleader.Id);
             Thread.Sleep(electionTimeout*5);
             Console.WriteLine("Restoring exleader " + exleader.Id);
-            inMemoryTransport.RestoreConnectivity(exleader.Id);
+            bus.RestoreConnectivity(exleader.Id);
             Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
             Thread.Sleep(electionTimeout * 5);
             Console.WriteLine("Leader is: " + nodes.First(n => n.State == NodeState.Follower).LeaderId);
             Console.WriteLine("Restoring follower " + follower.Id);
-            inMemoryTransport.RestoreConnectivity(follower.Id);
+            bus.RestoreConnectivity(follower.Id);
             Thread.Sleep(electionTimeout*10);
 
 
@@ -150,12 +150,11 @@ namespace Inceptum.Raft.Tests
         {
             const int electionTimeout = 150;
             Node<object>.m_Log.Clear();
-            var inMemoryTransport = new InMemoryTransport();
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                        inMemoryTransport, stateMachines[id]))
+                        new InMemoryTransport(id), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
             Thread.Sleep(electionTimeout * 5);

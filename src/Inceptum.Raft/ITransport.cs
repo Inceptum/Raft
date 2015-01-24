@@ -4,7 +4,7 @@ namespace Inceptum.Raft
 {
     public interface ITransport
     {
-        void Send<T>(string from, string to, T message);
-        IDisposable Subscribe<T>(string subscriberId, Action<T> handler);
+        void Send<T>(string to, T message);
+        IDisposable Subscribe<T>(Action<T> handler);
     }
 }

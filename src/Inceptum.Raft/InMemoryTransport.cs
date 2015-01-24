@@ -1,9 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using Inceptum.Raft;
 
 namespace Inceptum.Raft
 {
-    public class InMemoryTransport : ITransport 
+      public interface IInMemoryBus
+    {
+        void Send<T>(string from, string to, T message);
+        IDisposable Subscribe<T>(string subscriberId, Action<T> handler);
+    }
+ 
+    public class InMemoryBus:IInMemoryBus
     {
         readonly Dictionary<Tuple<string, Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<string, Type>, Action<object>>();
         readonly List<string> m_FailedNodes = new List<string>();
@@ -19,7 +27,7 @@ namespace Inceptum.Raft
 
         public void Send<T>(string from, string to, T message)
         {
-            if(m_FailedNodes.Contains(to))
+            if (m_FailedNodes.Contains(to))
                 return;
             if (m_FailedNodes.Contains(from))
                 return;
@@ -27,7 +35,7 @@ namespace Inceptum.Raft
             lock (m_Subscriptions)
             {
                 Action<object> handler;
-                if(m_Subscriptions.TryGetValue(key, out handler))
+                if (m_Subscriptions.TryGetValue(key, out handler))
                     handler(message);
             }
         }
@@ -37,7 +45,7 @@ namespace Inceptum.Raft
             var key = Tuple.Create(subscriberId, typeof(T));
             lock (m_Subscriptions)
             {
-                m_Subscriptions.Add(key, m => handler((T) m));
+                m_Subscriptions.Add(key, m => handler((T)m));
             }
             return ActionDisposable.Create(() =>
             {
@@ -48,4 +56,29 @@ namespace Inceptum.Raft
             });
         }
     }
+
+    public class InMemoryTransport : ITransport
+    {
+        private string m_NodeId;
+        private static IInMemoryBus m_DefaultBus=new InMemoryBus();
+        private static IInMemoryBus m_Bus;
+
+        public InMemoryTransport(string nodeId,IInMemoryBus bus=null)
+        {
+            m_Bus = bus ?? m_DefaultBus;
+            m_NodeId = nodeId;
+        }
+
+        public void Send<T>(string to, T message)
+        {
+           m_Bus.Send(m_NodeId,to,message);
+        }
+
+        public IDisposable Subscribe<T>(Action<T> handler)
+        {
+           return m_Bus.Subscribe(m_NodeId, handler);
+        }
+    }
+
+ 
 }

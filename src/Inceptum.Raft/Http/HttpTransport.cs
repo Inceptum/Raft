@@ -11,40 +11,38 @@ namespace Inceptum.Raft.Http
 {
     public class HttpTransport:ITransport
     {
-        readonly Dictionary<Tuple<string, Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<string, Type>, Action<object>>();
+        readonly Dictionary< Type , Action<object>> m_Subscriptions = new Dictionary<Type, Action<object>>();
 
         public void Accept<T>(T message)
         {
-            Action<object>[] handlers;
+            Action<object> handler;
+            var key = typeof (T);
             lock (m_Subscriptions)
             {
-                handlers = m_Subscriptions.Where(p => p.Key.Item2 == typeof (T)).Select(p => p.Value).ToArray();
+                if (!m_Subscriptions.TryGetValue(key,out handler))
+                    return;
             }
-            foreach (var handler in handlers)
-            {
-                //TODO: exception handling
-                handler(message);
-            }
+
+            //TODO: exception handling
+            handler(message);
         }
 
-        public void Send<T>(string @from, string to, T message)
+        public void Send<T>( string to, T message)
         {
-            if (@from == to)
-            {
-                Accept(message);
-                return;
-            }
+            
 /*
             HttpClient c = new HttpClient();
             c.SendAsync()
 */
         }
 
-        public IDisposable Subscribe<T>(string subscriberId, Action<T> handler)
+        public IDisposable Subscribe<T>(  Action<T> handler)
         {
-            var key = Tuple.Create(subscriberId, typeof(T));
+            var key =   typeof(T);
             lock (m_Subscriptions)
             {
+                if (m_Subscriptions.ContainsKey(key))
+                    throw new InvalidOperationException(string.Format("Handler for {0} is already registered",key));
                 m_Subscriptions.Add(key, m => handler((T)m));
             }
             return ActionDisposable.Create(() =>

@@ -46,13 +46,13 @@ namespace TestConsoleApplication
             {
                 var knownNodes = Enumerable.Range(1, 5).Select(i => "node" + i);
 
-                var inMemoryTransport = new InMemoryTransport();
+                var bus = new InMemoryBus();
 
                 var nodes = knownNodes.Select(
                     id =>new Node<int>(
                             new InMemoryPersistentState<int>(), 
                             new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                            inMemoryTransport, 
+                            new InMemoryTransport(id,bus), 
                             new StateMachine()))
                     .ToArray();
 
@@ -93,11 +93,11 @@ namespace TestConsoleApplication
                 Console.ReadLine();
                 var leaderId = nodes.First().LeaderId;
                 Console.WriteLine("Failing the leader" + leaderId);
-               inMemoryTransport.EmulateConnectivityIssue(leaderId);
+               bus.EmulateConnectivityIssue(leaderId);
 
                Console.ReadLine();
                Console.WriteLine("Restoring ex leader" + leaderId);
-               inMemoryTransport.RestoreConnectivity(leaderId);
+               bus.RestoreConnectivity(leaderId);
                Thread.Sleep(1000);
 
                Console.ReadLine();

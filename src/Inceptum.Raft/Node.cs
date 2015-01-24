@@ -122,7 +122,6 @@ namespace Inceptum.Raft
         private IDisposable subscribe<T>(Action<T> handler)
         {
             return m_Transport.Subscribe<T>(
-                Id,
                 message => Task.Factory.StartNew(() =>
                 {
                     lock (m_SyncRoot)
@@ -370,7 +369,7 @@ namespace Inceptum.Raft
         {
              try
              {
-                 m_Transport.Send(Id, to,message);
+                 m_Transport.Send(to,message);
              }
              catch (Exception e)
              {

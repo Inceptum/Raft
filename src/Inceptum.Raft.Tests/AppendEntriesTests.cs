@@ -87,16 +87,16 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100 };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Twice();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Twice();
+            var bus = mockTransport();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Twice();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Twice();
 
-            using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToLeader();
                 Thread.Sleep(150);
-                transport.VerifyAllExpectations();//send AppendEntriesRequest to all nodes twice - on election amd after timeout elapsed
+                bus.VerifyAllExpectations();//send AppendEntriesRequest to all nodes twice - on election amd after timeout elapsed
             }
         }        
         [Test(Description = "If last log index ≥ nextIndex for a follower: send AppendEntries RPC with log entries starting at nextIndex")]
@@ -108,7 +108,7 @@ namespace Inceptum.Raft.Tests
             //TODO: send AppendEntriesRequest immediately on not success response
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100  };
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
+            var bus = mockTransport();
             List<AppendEntriesRequest<int>> requests = new List<AppendEntriesRequest<int>>();
             var requestSent = new ManualResetEvent(false);
             int cnt=0;
@@ -128,10 +128,10 @@ namespace Inceptum.Raft.Tests
                 requestSent.Set();
             };
 
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Once();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Times(4).Do(send);
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Once();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest<int>>.Is.Anything)).Repeat.Times(4).Do(send);
 
-            using (  node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            using (node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -141,7 +141,7 @@ namespace Inceptum.Raft.Tests
                 Assert.That(requests[1].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 2) }),"Leader did not repeated last entry when got first unsuccessful response");
                 Assert.That(requests[2].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated 2 last entries when got first unsuccessful response");
                 Assert.That(requests[3].Entries, Is.EqualTo(new LogEntry<int>[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2) }), "Leader did not repeated all entries when got more unsuccessful responses then entries count in the log");
-                transport.VerifyAllExpectations();//send AppendEntriesRequest to all nodes twice - on election amd after timeout elapsed
+                bus.VerifyAllExpectations();//send AppendEntriesRequest to all nodes twice - on election amd after timeout elapsed
             }
         }
 
@@ -154,23 +154,23 @@ namespace Inceptum.Raft.Tests
             AppendEntriesResponse response = null;
             var responseSent = new ManualResetEvent(false);
             Action<string, string, AppendEntriesResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
-            var transport = mockTransport();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
-            var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine);
+            var bus = mockTransport();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
+            var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), stateMachine);
             using (doNotDisposeNode?ActionDisposable.Create(() => { }):node)
             {
                 node.Start();
                 node.Handle(appendEntriesRequest);
                 Assert.That(responseSent.WaitOne(1000), Is.True, "Response was not sent");
-                transport.VerifyAllExpectations();
+                bus.VerifyAllExpectations();
                 return Tuple.Create(response, node);
             }
 
         }
 
-        private static ITransport mockTransport()
+        private static IInMemoryBus mockTransport()
         {
-            var transport = MockRepository.GenerateMock<ITransport>();
+            var transport = MockRepository.GenerateMock<IInMemoryBus>();
             transport.Expect(t => t.Subscribe<VoteRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<VoteResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesRequest<int>>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));

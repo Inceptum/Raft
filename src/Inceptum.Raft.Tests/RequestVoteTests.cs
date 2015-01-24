@@ -90,14 +90,14 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
-            using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var bus = mockTransport();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToCandidate();
-                transport.VerifyAllExpectations();
+                bus.VerifyAllExpectations();
                 Assert.That(node.CurrentTerm,Is.EqualTo(2),"Term was not incremented");
             }
         }
@@ -108,8 +108,8 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-            using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var bus = mockTransport();
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -124,8 +124,8 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-             using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var bus = mockTransport();
+             using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -144,8 +144,8 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-             using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var bus = mockTransport();
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -160,8 +160,8 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState<int> { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            var transport = mockTransport();
-             using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            var bus = mockTransport();
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 Thread.Sleep(200);
@@ -176,10 +176,10 @@ namespace Inceptum.Raft.Tests
             VoteResponse response = null;
             var responseSent = new AutoResetEvent(false);
             Action<string, string, VoteResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
-            var transport = mockTransport();
-            transport.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Anything, Arg<VoteResponse>.Is.Anything)).Do(send).Repeat.Times(voteRequests.Count());
+            var bus = mockTransport();
+            bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Anything, Arg<VoteResponse>.Is.Anything)).Do(send).Repeat.Times(voteRequests.Count());
 
-            using (var node = new Node<int>(persistentState, nodeConfiguration, transport, stateMachine))
+            using (var node = new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
             {
                 node.Start();
                 foreach (var request in voteRequests)
@@ -190,11 +190,11 @@ namespace Inceptum.Raft.Tests
                 }
             }
         }
- 
 
-        private static ITransport mockTransport()
+
+        private static IInMemoryBus mockTransport()
         {
-            var transport = MockRepository.GenerateMock<ITransport>();
+            var transport = MockRepository.GenerateMock<IInMemoryBus>();
             transport.Expect(t => t.Subscribe<VoteRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<VoteResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesRequest<int>>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
