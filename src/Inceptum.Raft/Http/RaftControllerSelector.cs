@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Reflection;
@@ -16,7 +15,7 @@ namespace Inceptum.Raft.Http
     {
         private readonly IHttpControllerSelector m_ControllerSelector;
         private readonly HttpControllerDescriptor m_RaftControllerDescriptor;
-        private string m_RouteName;
+        private readonly string m_RouteName;
 
         public RaftControllerSelector(HttpConfiguration configuration, IHttpControllerSelector controllerSelector, string routeName)
         {

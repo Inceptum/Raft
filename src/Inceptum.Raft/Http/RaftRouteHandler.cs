@@ -6,8 +6,8 @@ namespace Inceptum.Raft.Http
 {
     internal class RaftRouteHandler : DelegatingHandler
     {
-        private string m_RouteName;
-        private HttpTransport m_HttpTransport;
+        private readonly string m_RouteName;
+        private readonly HttpTransport m_HttpTransport;
 
         public RaftRouteHandler(string routeName, HttpTransport httpTransport)
         {

@@ -14,9 +14,7 @@ namespace Inceptum.Raft.Http
      
         public override Task<HttpResponseMessage> ExecuteAsync(HttpControllerContext controllerContext, CancellationToken cancellationToken)
         {
-            //m_Transport = (HttpTransport)controllerContext.Configuration.Properties[typeof(HttpTransport)];
             m_Transport = (HttpTransport)controllerContext.Request.Properties["RaftTransport"];
-
             return base.ExecuteAsync(controllerContext, cancellationToken);
         }
 

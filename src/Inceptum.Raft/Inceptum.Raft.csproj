@@ -59,6 +59,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ActionDisposable.cs" />
+    <Compile Include="Http\AppendEntriesRequestContent.cs" />
     <Compile Include="Http\HttpTransport.cs" />
     <Compile Include="Http\RaftController.cs" />
     <Compile Include="Http\RaftControllerSelector.cs" />
