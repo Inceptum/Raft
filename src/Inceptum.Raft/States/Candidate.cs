@@ -53,6 +53,11 @@ namespace Inceptum.Raft.States
 
         public override void Handle(VoteResponse vote)
         {
+            if (vote.Term != Node.CurrentTerm)
+            {
+                //Ignore respnses from older terms
+                return;
+            }
             Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
 
             m_Votes[vote.NodeId] = vote;

@@ -399,6 +399,10 @@ namespace Inceptum.Raft
         {
             m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + string.Format(" {{{0:00}}}", Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" +
                              PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+#if DEBUG
+            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff ") + string.Format(" {{{0:00}}}", Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" +
+                             PersistentState.CurrentTerm + "]:" + string.Format(format, args));
+#endif
         }
     }
 }

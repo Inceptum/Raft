@@ -29,9 +29,32 @@ namespace TestConsoleApplication
             //   Test(150);
             string baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9222);
 
+            var knownNodes = Enumerable.Range(1, 3).Select(i => "node" + i);
+
+            var transports = knownNodes.ToDictionary(n => n, n => new HttpTransport(knownNodes.ToDictionary(kn => kn, kn => new Uri(string.Format("{0}/{1}/",baseUrl, kn)))));
+
+            var nodes = transports.Select(
+                   p => new Node<int>(
+                           new InMemoryPersistentState<int>(),
+                           new NodeConfiguration(p.Key, knownNodes.ToArray()) { ElectionTimeout = 300 },
+                           p.Value,
+                           new StateMachine()))
+                   .ToArray();
+
+  
             var config = new HttpSelfHostConfiguration(baseUrl);
-            var server = new HttpSelfHostServer(new HttpTransport().ConfigureHost(config));
+            foreach (var t in transports)
+            {
+                t.Value.ConfigureHost<HttpSelfHostConfiguration, int>(config,t.Key);
+            }
+            var server = new HttpSelfHostServer(config);
             server.OpenAsync().Wait();
+
+            foreach (var node in nodes)
+            {
+                node.Start();
+            }
+
 
             Console.ReadLine();
             server.CloseAsync().Wait();
