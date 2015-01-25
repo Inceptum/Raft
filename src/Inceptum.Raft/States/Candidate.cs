@@ -58,7 +58,12 @@ namespace Inceptum.Raft.States
                 //Ignore respnses from older terms
                 return;
             }
-            Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
+            //It is possible to get multiple VoteReponses from same node. It happends if after term incremented it gets 
+            //responce for request, sent in previous terms. 
+            //If voter had same term as curent node has right now such response will reach this point. 
+            //It is ok since node grants vote to single node during term. 
+            //Spent lot of time to find out why the assert is firing :)
+            //Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
 
             m_Votes[vote.NodeId] = vote;
             if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
