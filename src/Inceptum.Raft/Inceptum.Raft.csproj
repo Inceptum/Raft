@@ -66,6 +66,10 @@
     <Compile Include="Http\RaftRouteHandler.cs" />
     <Compile Include="InMemoryPersistentState.cs" />
     <Compile Include="IStateMachine.cs" />
+    <Compile Include="JetBrainsAnnotations.cs" />
+    <Compile Include="Logging\ConsoleLogger.cs" />
+    <Compile Include="Logging\ILogger.cs" />
+    <Compile Include="Logging\LoggerWrapper.cs" />
     <Compile Include="SingleThreadTaskScheduler.cs" />
     <Compile Include="InMemoryTransport.cs" />
     <Compile Include="ITransport.cs" />

@@ -13,7 +13,6 @@ namespace Inceptum.Raft.States
 
         public override void Enter()
         {
-            Node.Log("I am follower");
             Node.ResetTimeout();
             base.Enter();
 
@@ -21,7 +20,7 @@ namespace Inceptum.Raft.States
 
         public override void Timeout()
         {
-            Node.Log("No Append entries within timeout. ");
+            Node.Logger.Debug("No Append entries within timeout. Switching state to Candidate");
             Node.SwitchToCandidate();
         }
 
@@ -39,13 +38,13 @@ namespace Inceptum.Raft.States
 
         public override bool Handle(AppendEntriesRequest<TCommand> request)
         {
-            Node.Log("Got HB from leader:{0}", Node.LeaderId);
+            Node.Logger.Trace("Got HB from leader:{0}", Node.LeaderId);
 
             //Reply false if term < currentTerm (§5.1)
             if (request.Term < Node.PersistentState.CurrentTerm)
             {
 
-                Console.WriteLine("{3} > Rejecting AppendEntries from {0} as term {1} is newer the current {2}",
+                Node.Logger.Trace("{3} > Rejecting AppendEntries from {0} as term {1} is newer the current {2}",
                     request.LeaderId, request.Term, Node.PersistentState.CurrentTerm, Node.Id);
                 return false;
             }

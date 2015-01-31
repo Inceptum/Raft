@@ -40,7 +40,6 @@ namespace Inceptum.Raft.Tests
         public void ConsensusIsReachableWithin5ElectionTimeoutsTest()
         {
             const int electionTimeout = 150;
-            Node<object>.m_Log.Clear();
             var nodes = m_KnownNodes.Select(
                 id => new Node<int>(new InMemoryPersistentState<int>(),
                                     new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, 
@@ -69,7 +68,6 @@ namespace Inceptum.Raft.Tests
         {
             //TDOD: not sture if it is right logic - SM holds state in memory , so it makes no sence to finish command processing on dispose since SM would be disposed right after it and state would be lost
             const int electionTimeout = 150;
-            Node<object>.m_Log.Clear();
             var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
             var nodes = m_KnownNodes.Select(
@@ -82,7 +80,7 @@ namespace Inceptum.Raft.Tests
             Thread.Sleep(electionTimeout * 5);
             var leader = nodes.First(n => n.State == NodeState.Leader);
 
-            ManualResetEvent exited=new ManualResetEvent(false);
+            var exited=new ManualResetEvent(false);
             Task.Factory.StartNew(() => {
                 leader.Apply(10);
                 exited.Set();
@@ -99,7 +97,6 @@ namespace Inceptum.Raft.Tests
         public void RestoredFollowerGetsAllMissedLogEntriesTest()
         {
             const int electionTimeout = 150;
-            Node<object>.m_Log.Clear();
             var bus = new InMemoryBus();
             var stateMachines = m_KnownNodes.ToDictionary(k=>k,v=>new StateMachine());
             var nodes = m_KnownNodes.Select(
@@ -149,7 +146,6 @@ namespace Inceptum.Raft.Tests
         public void LongStateMachineCommandProcessingTimeTest()
         {
             const int electionTimeout = 150;
-            Node<object>.m_Log.Clear();
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
             var nodes = m_KnownNodes.Select(
                 id =>

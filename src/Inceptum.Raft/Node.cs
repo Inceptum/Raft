@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Inceptum.Raft.Logging;
 using Inceptum.Raft.Rpc;
 using Inceptum.Raft.States;
 
@@ -11,20 +12,23 @@ namespace Inceptum.Raft
 {
     public enum NodeState
     {
+        None,
         Leader,
         Candidate,
         Follower
     }
 
-    //TODO: real world transport
+    //TODO: real world transport (tests)
     //TODO: command accepting from clients
     //TODO: logging
     //TODO: restart node on state machine crash
     //TODO: snapshots
+    //TODO: get rid of <TCommand>
+    //TODO: fluent configuration
+    //TODO: Cluster membership changes
 
     public class Node<TCommand> : IDisposable
     {
-        public static readonly StringBuilder m_Log = new StringBuilder();
         private readonly AutoResetEvent m_ResetTimeout = new AutoResetEvent(false);
         private readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
         private readonly SingleThreadTaskScheduler m_Scheduler;
@@ -35,6 +39,8 @@ namespace Inceptum.Raft
         private INodeState<TCommand> m_State;
         private int m_TimeoutBase;
         private readonly StateMachineHost<TCommand> m_StateMachineHost;
+        private string m_LeaderId;
+        internal ILogger Logger { get; private set; }
 
 
         public NodeConfiguration Configuration { get; private set; }
@@ -63,13 +69,23 @@ namespace Inceptum.Raft
         /// </value>
         public long LastApplied { get { return m_StateMachineHost.LastApplied; } }
 
-        public string LeaderId { get; private set; }
+        public string LeaderId
+        {
+            get { return m_LeaderId; }
+            private set
+            {
+                if(m_LeaderId==value)
+                    return;
+                m_LeaderId = value;
+                Logger.Debug("Got new leader {0}", LeaderId);
+            }
+        }
 
         public string Id { get; private set; }
 
         public NodeState State
         {
-            get { return m_State.State; }
+            get { return m_State==null?NodeState.None: m_State.State; }
         }
 
         public long CurrentTerm
@@ -93,6 +109,7 @@ namespace Inceptum.Raft
         {
             
         }
+
         public Node(PersistentStateBase<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
         {
             m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
@@ -117,6 +134,7 @@ namespace Inceptum.Raft
 
             m_TimeoutBase = Configuration.ElectionTimeout;
             CommitIndex = -1;
+            Logger =new LoggerWrapper<TCommand>(this, Configuration.LoggerFactory(GetType()));
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -131,7 +149,7 @@ namespace Inceptum.Raft
                         }
                         catch (Exception e)
                         {
-                            Log("Failed to nandle {0}: {1}",typeof(T).Name, e.ToString());
+                            Logger.Debug(e,"Failed to handle {0}", typeof(T).Name);
                         }
                     }
                 }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler));
@@ -139,7 +157,7 @@ namespace Inceptum.Raft
 
         public void Start()
         {
-            SwitchToFollower(null);
+            switchToFollower(null);
             m_TimeoutHandlingThread.Start();
         }
 
@@ -169,7 +187,7 @@ namespace Inceptum.Raft
                 switch (res)
                 {
                     case WaitHandle.WaitTimeout:
-                        Log("Timeout elapsed ({0})", timeoutBase);
+                        Logger.Trace("Timeout elapsed ({0})", timeoutBase);
                         lock (m_SyncRoot)
                         {
                             try
@@ -178,12 +196,12 @@ namespace Inceptum.Raft
                             }
                             catch (Exception e)
                             {
-                                Log("Failed to process timeout: {0}",e.ToString());
+                                Logger.Debug(e, "Failed to process timeout");
                             }
                         }
                         break;
                     case 1:
-                        Log("Timeout reset");
+                        Logger.Trace("Timeout reset");
                         break;
                 }
                 m_ResetTimeout.Reset();
@@ -193,7 +211,7 @@ namespace Inceptum.Raft
         internal void ResetTimeout()
         {
             m_TimeoutBase = m_State.GetTimeout(Configuration.ElectionTimeout);
-            Log("timeout reset for {0}", m_TimeoutBase);
+            Logger.Trace("timeout reset for {0}", m_TimeoutBase);
             m_ResetTimeout.Set();
         }
 
@@ -209,16 +227,22 @@ namespace Inceptum.Raft
             switchTo(new Leader<TCommand>(this));
         }
 
-        internal void SwitchToFollower(string leaderId)
+        private void switchToFollower(string leaderId)
         {
             LeaderId = leaderId;
+            if (State == NodeState.Follower) 
+                return;
+
+            Logger.Debug("Switching state to Follower");
             switchTo(new Follower<TCommand>(this));
         }
 
         private void switchTo(INodeState<TCommand> state)
         {
+          
             m_State = state;
             m_State.Enter();
+            Logger.Debug("Switched to {0}", State);
         }
 
 
@@ -230,7 +254,7 @@ namespace Inceptum.Raft
             }
             catch (Exception e)
             {
-                Log("Failed to send AppendEntriesRequest message  to node {0}: {1} ",  node, e.ToString());
+                Logger.Trace(e,"Failed to send AppendEntriesRequest message  to node {0} ", node);
             }
             
         }
@@ -253,7 +277,7 @@ namespace Inceptum.Raft
                 }
                 catch (Exception e)
                 {
-                    Log("Failed to send VoteRequest message  to node {0}: {1} ", node, e.ToString());
+                    Logger.Trace(e,"Failed to send VoteRequest message  to node {0}", node);
                 }
             }
         }
@@ -275,19 +299,20 @@ namespace Inceptum.Raft
 
             if (!Configuration.KnownNodes.Contains(request.LeaderId))
             {
-                Log("Got AppendEntriesRequest from unknown node {0}. Ignoring...", request.LeaderId);
+                Logger.Trace("Got AppendEntriesRequest from unknown node {0}. Ignoring...", request.LeaderId);
                 return;
             }
             ResetTimeout();
 
             if (request.Term > PersistentState.CurrentTerm)
             {
-                Log("Got newer term from leader {2}. {0} -> {1}", PersistentState.CurrentTerm, request.Term, request.LeaderId);
+                Logger.Debug("Got newer term {0} from leader {1}",  request.Term, request.LeaderId);
                 PersistentState.CurrentTerm = request.Term;
             }
+
             if (request.Term >= PersistentState.CurrentTerm && (State != NodeState.Follower || LeaderId != request.LeaderId))
             {
-                SwitchToFollower(request.LeaderId);
+                switchToFollower(request.LeaderId);
             }
 
             try
@@ -301,7 +326,7 @@ namespace Inceptum.Raft
             }
             catch (Exception e)
             {
-                Log("Failed to send AppendEntriesResponse message  to node {0}: {1} ", request.LeaderId, e.ToString());
+                Logger.Trace(e,"Failed to send AppendEntriesResponse message  to node {0}", request.LeaderId);
             }
             
 
@@ -312,14 +337,14 @@ namespace Inceptum.Raft
 
             if (!Configuration.KnownNodes.Contains(response.NodeId))
             {
-                Log("Got AppendEntriesResponse from unknown node {0}. Ignoring...", response.NodeId);
+                Logger.Trace("Got AppendEntriesResponse from unknown node {0}. Ignoring...", response.NodeId);
                 return;
             }
             if (response.Term > PersistentState.CurrentTerm)
             {
-                Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, response.Term, response.NodeId);
+                Logger.Debug("Got newer term {0} from node {1}", response.Term, response.NodeId);
                 PersistentState.CurrentTerm = response.Term;
-                SwitchToFollower(null);
+                switchToFollower(null);
             }
             m_State.Handle(response);
 
@@ -330,20 +355,21 @@ namespace Inceptum.Raft
         {
             if (!Configuration.KnownNodes.Contains(voteRequest.CandidateId))
             {
-                Log("Got VoteRequest from unknown node {0}. Ignoring...", voteRequest.CandidateId);
+                Logger.Trace("Got VoteRequest from unknown node {0}. Ignoring...", voteRequest.CandidateId);
                 return;
             }
             if (voteRequest.Term > PersistentState.CurrentTerm)
             {
-                Log("Got newer term from  candidate {2}. {0} -> {1}", PersistentState.CurrentTerm, voteRequest.Term, voteRequest.CandidateId);
+                Logger.Debug("Got newer term {0} from candidate {1}.", voteRequest.Term, voteRequest.CandidateId);
                 PersistentState.CurrentTerm = voteRequest.Term;
-                SwitchToFollower(null);
+                switchToFollower(null);
             }
 
             var granted = m_State.Handle(voteRequest);
             if (granted)
             {
                 PersistentState.VotedFor = voteRequest.CandidateId;
+                Logger.Debug("Voting for {0}", voteRequest.CandidateId);
                 ResetTimeout();
             }
             try
@@ -358,7 +384,7 @@ namespace Inceptum.Raft
             }
             catch (Exception e)
             {
-                Log("Failed to send VoteResponse message  to node {0}: {1} ", voteRequest.CandidateId, e.ToString());
+                Logger.Trace(e,"Failed to send VoteResponse message  to node {0} ", voteRequest.CandidateId);
             }
         }
 
@@ -366,15 +392,15 @@ namespace Inceptum.Raft
         {
             if (!Configuration.KnownNodes.Contains(vote.NodeId))
             {
-                Log("Got VoteResponse from unknown node {0}. Ignoring...", vote.NodeId);
+                Logger.Trace("Got VoteResponse from unknown node {0}. Ignoring...", vote.NodeId);
                 return;
             }
 
             if (vote.Term > PersistentState.CurrentTerm)
             {
-                Log("Got newer term from  node {2}. {0} -> {1}", PersistentState.CurrentTerm, vote.Term, vote.NodeId);
+                Logger.Debug("Got newer term {0} from node {1}", vote.Term, vote.NodeId);
                 PersistentState.CurrentTerm = vote.Term;
-                SwitchToFollower(null);
+                switchToFollower(null);
             }
 
             m_State.Handle(vote);
@@ -384,7 +410,7 @@ namespace Inceptum.Raft
 
         public void Dispose()
         {
-            foreach (IDisposable subscription in m_Subscriptions)
+            foreach (var subscription in m_Subscriptions)
             {
                 subscription.Dispose();
             }
@@ -392,17 +418,6 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
             m_StateMachineHost.Dispose();
-        }
- 
-
-        public void Log(string format, params object[] args)
-        {
-            m_Log.AppendLine(DateTime.Now.ToString("HH:mm:ss.fff ") + string.Format(" {{{0:00}}}", Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" +
-                             PersistentState.CurrentTerm + "]:" + string.Format(format, args));
-#if DEBUG
-            Console.WriteLine(DateTime.Now.ToString("HH:mm:ss.fff ") + string.Format(" {{{0:00}}}", Thread.CurrentThread.ManagedThreadId) + "> " + Id + "[" +
-                             PersistentState.CurrentTerm + "]:" + string.Format(format, args));
-#endif
         }
     }
 }

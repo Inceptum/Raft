@@ -36,7 +36,6 @@ namespace Inceptum.Raft.States
 
         public override void Enter()
         {
-            Node.Log("I am leader");
 
             foreach (var node in Node.Configuration.KnownNodes)
             {
@@ -45,7 +44,6 @@ namespace Inceptum.Raft.States
                 LastSentIndex[node] = -1;
             }
             Node.ResetTimeout();
-            Node.Log("I AM THE LEADER!!!!! Sending HB");
             //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
             appendEntries();
             base.Enter();
@@ -58,7 +56,7 @@ namespace Inceptum.Raft.States
 
         public override void Timeout()
         {
-            Node.Log("I AM THE LEADER!!!!! Sending HB");
+            Node.Logger.Trace("Sending HB");
             //Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server; repeat during idle periods to prevent election timeouts (§5.2)
             appendEntries();
         }

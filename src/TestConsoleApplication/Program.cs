@@ -63,7 +63,6 @@ namespace TestConsoleApplication
 
         private static void Test(int electionTimeout)
         {
-            Node<object>.m_Log.Clear();
             var sb = new StringBuilder();
             try
             {
@@ -151,14 +150,12 @@ namespace TestConsoleApplication
                 Console.WriteLine(sb.ToString());
                 Console.WriteLine();
                 Console.WriteLine();
-                Console.WriteLine(Node<object>.m_Log);
 
                 throw;
             }
 
             finally
             {
-                System.IO.File.WriteAllText("out.log", Node<object>.m_Log.ToString());
                 //Console.WriteLine(Node<object>.m_Log);
             }
             

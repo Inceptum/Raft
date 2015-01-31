@@ -26,14 +26,14 @@ namespace Inceptum.Raft.States
 
         public virtual void Handle( VoteResponse vote)
         {
-            Node.Log("Ignoring RequestVoteResponse since node is not a candidate");
+            Node.Logger.Trace("Ignoring RequestVoteResponse since node is not a candidate");
             
         }
         public abstract bool Handle(AppendEntriesRequest<TCommand> request);
 
         public virtual void Handle( AppendEntriesResponse response)
         {
-            Node.Log("Ignoring AppendEntriesResponse since node is not a leader");
+            Node.Logger.Trace("Ignoring AppendEntriesResponse since node is not a leader");
         }
 
 

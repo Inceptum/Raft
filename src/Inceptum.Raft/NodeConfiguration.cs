@@ -1,9 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Inceptum.Raft.Logging;
 
 namespace Inceptum.Raft
 {
+
+    public class Configurator
+    {
+        private NodeConfiguration m_Configuration;
+
+        public Configurator(NodeConfiguration configuration )
+        {
+            m_Configuration = configuration;
+        }
+
+        public Configurator WithLogerFactory(Func<Type,ILogger> loggerFactory)
+        {
+            m_Configuration.LoggerFactory = loggerFactory;
+            return this;
+        }
+    }
+
     public class NodeConfiguration
     {
         public int ElectionTimeout { get; set; } 
@@ -19,7 +37,7 @@ namespace Inceptum.Raft
                 throw new ArgumentException("knownNodes should conatin only not empty string", "knownNodes");
             if (knownNodes.Distinct().Count() != knownNodes.Count())
                 throw new ArgumentException("knownNodes should conatin unique node names", "knownNodes");
-
+            LoggerFactory=type => new ConsoleLogger(type.Name);
             NodeId = nodeId;
             KnownNodes = knownNodes.Where(n=>n!=nodeId).Distinct().ToList();
         }
@@ -28,5 +46,7 @@ namespace Inceptum.Raft
         {
             get { return KnownNodes == null ? 0 : KnownNodes.Count / 2 + 1; }
         }
+
+        internal Func<Type, ILogger> LoggerFactory { get; set; }
     }
 }

@@ -19,14 +19,13 @@ namespace Inceptum.Raft.States
         {
             //On conversion to candidate, start election
             startElection();
-            Node.Log("I am candidate");
             base.Enter();
         }
 
         private void startElection()
         {
             Node.ResetTimeout();
-            Node.Log("Starting Election");
+            Node.Logger.Trace("Starting Election");
             m_Votes = new Dictionary<string, VoteResponse>();
             //vote for itself
             Handle(new VoteResponse
@@ -67,7 +66,11 @@ namespace Inceptum.Raft.States
 
             m_Votes[vote.NodeId] = vote;
             if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
+            {
+                var grantedBy = string.Join(", ",m_Votes.Values.Where(v => v.VoteGranted).Select(r => r.NodeId).ToArray());
+                Node.Logger.Debug("Vote granted may majority of nodes - {0}. Switching state to Leader", grantedBy);
                 Node.SwitchToLeader();
+            }
 
         }
 
