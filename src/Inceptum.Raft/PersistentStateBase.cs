@@ -67,10 +67,17 @@ namespace Inceptum.Raft
 
         protected PersistentStateBase()
         {
-            m_Log = new List<LogEntry<TCommand>>(LoadLog());
-            var  state=LoadState();
+            m_Log = new List<LogEntry<TCommand>>();
+        }
+
+
+        protected void Init()
+        {
+            m_Log.AddRange(LoadLog());
+            var state = LoadState();
             m_CurrentTerm = state.Item1;
             m_VotedFor = state.Item2;
+
         }
 
 
@@ -90,7 +97,7 @@ namespace Inceptum.Raft
             var index = prevLogIndex + 1;
             if (index >= m_Log.Count) 
                 return false;
-            RemoveLogAfter(index);
+            RemoveLogStartingFrom(index);
             m_Log.RemoveRange(index, m_Log.Count - index);
             return true;
         }
@@ -128,7 +135,7 @@ namespace Inceptum.Raft
         protected abstract Tuple<long, string> LoadState();
         protected abstract void SaveState(long currentTerm, string votedFor);
         protected abstract IEnumerable<LogEntry<TCommand>> LoadLog();
-        protected abstract void RemoveLogAfter(int index);
+        protected abstract void RemoveLogStartingFrom(int index);
         protected abstract void AppendLog(params LogEntry<TCommand>[] logEntries);
 
     }

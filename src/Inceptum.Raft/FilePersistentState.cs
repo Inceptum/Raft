@@ -28,9 +28,11 @@ namespace Inceptum.Raft
             }
             while (m_LogFileStream.Position<m_LogFileStream.Length)
             {
+                var position = m_LogFileStream.Position;
                 m_Formatter.Deserialize(m_LogFileStream);
-                m_Map.Add(m_Map.Count, m_LogFileStream.Position);
+                m_Map.Add(m_Map.Count, position);
             }
+            Init();
         }
 
         protected override Tuple<long, string> LoadState()
@@ -51,8 +53,9 @@ namespace Inceptum.Raft
             m_LogFileStream.Seek(0, SeekOrigin.End);
             foreach (var logEntry in logEntries)
             {
-                m_Formatter.Serialize(m_LogFileStream, logEntry);   
-                m_Map.Add(m_Map.Count,m_LogFileStream.Position);
+                var position = m_LogFileStream.Length;
+                m_Formatter.Serialize(m_LogFileStream, logEntry);
+                m_Map.Add(m_Map.Count, position);
             }
             m_LogFileStream.Flush();
         }
@@ -73,9 +76,10 @@ namespace Inceptum.Raft
             }
         }
 
-        protected override void RemoveLogAfter(int index)
+        protected override void RemoveLogStartingFrom(int index)
         {
             m_LogFileStream.SetLength(m_Map[index]);
+            m_LogFileStream.Flush();
         }
 
         public void Dispose()

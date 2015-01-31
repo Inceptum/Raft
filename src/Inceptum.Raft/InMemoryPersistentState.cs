@@ -20,7 +20,7 @@ namespace Inceptum.Raft
             return new LogEntry<TCommand>[0];
         }
 
-        protected override void RemoveLogAfter(int index)
+        protected override void RemoveLogStartingFrom(int index)
         {
              
         }
