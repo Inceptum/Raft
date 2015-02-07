@@ -38,20 +38,20 @@ namespace Inceptum.Raft.Http
             handler(message);
         }
 
-        public IDisposable RunHost<TCommand>(string baseUrl)
+        public IDisposable RunHost(string baseUrl)
         {
             var config = new HttpSelfHostConfiguration(baseUrl);
-            var server = new HttpSelfHostServer(ConfigureHost<HttpSelfHostConfiguration,TCommand>(config));
+            var server = new HttpSelfHostServer(ConfigureHost<HttpSelfHostConfiguration>(config));
             server.OpenAsync().Wait();
             return ActionDisposable.Create(() => server.CloseAsync().Wait());
         }
 
-        public TConfiguration ConfigureHost<TConfiguration, TCommand>(TConfiguration config,string urlPrefix=null)
+        public TConfiguration ConfigureHost<TConfiguration>(TConfiguration config,string urlPrefix=null)
             where TConfiguration:HttpConfiguration
         {
             var routeName = "Raft" + (urlPrefix??"");
             var controllerSelector = config.Services.GetService(typeof(IHttpControllerSelector)) as IHttpControllerSelector;
-            config.Services.Replace(typeof(IHttpControllerSelector), new RaftControllerSelector<TCommand>(config, controllerSelector, routeName));
+            config.Services.Replace(typeof(IHttpControllerSelector), new RaftControllerSelector(config, controllerSelector, routeName));
 
 
             config.Routes.MapHttpRoute(routeName, urlPrefix!=null  ? urlPrefix + "/raft/{action}" : "raft/{action}",
@@ -82,14 +82,14 @@ namespace Inceptum.Raft.Http
          
         }
 
-        public void Send<TCommand>(string to, AppendEntriesRequest<TCommand> message)
+        public void Send(string to, AppendEntriesRequest message)
         {
             Uri baseUri;
             if (!m_Endpoints.TryGetValue(to, out baseUri))
                 throw new InvalidOperationException(string.Format("Uri for node {0} is not provided", to));
             var requestUri = string.Format("raft/AppendEntriesRequest?Term={0}&LeaderId={1}&PrevLogIndex={2}&PrevLogTerm={3}&LeaderCommit={4}", message.Term, message.LeaderId, message.PrevLogIndex, message.PrevLogTerm, message.LeaderCommit);
 
-            send(baseUri, client => client.PostAsync(requestUri, new AppendEntriesRequestContent<TCommand>(message.Entries)));
+            send(baseUri, client => client.PostAsync(requestUri, new AppendEntriesRequestContent(message.Entries)));
         }
 
 

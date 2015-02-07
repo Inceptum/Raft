@@ -4,7 +4,7 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft
 {
-    interface INodeState<TCommand>
+    interface INodeState
     {
         NodeState State { get; }
         DateTime EnterTime { get; }
@@ -12,9 +12,9 @@ namespace Inceptum.Raft
         void Timeout();
         bool Handle(VoteRequest voteRequest);
         void Handle(VoteResponse vote);
-        bool Handle(AppendEntriesRequest<TCommand> request);
+        bool Handle(AppendEntriesRequest request);
         void Handle(AppendEntriesResponse response);
         int GetTimeout(int electionTimeout);
-        Task<object> Apply(TCommand command);
+        Task<object> Apply(object command);
     }
 }

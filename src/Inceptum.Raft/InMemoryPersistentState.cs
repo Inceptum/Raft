@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Inceptum.Raft
 {
-    public class InMemoryPersistentState<TCommand> : PersistentStateBase<TCommand>
+    public class InMemoryPersistentState : PersistentStateBase
     {
         protected override Tuple<long, string> LoadState()
         {
@@ -15,9 +15,9 @@ namespace Inceptum.Raft
             
         }
 
-        protected override IEnumerable<LogEntry<TCommand>> LoadLog()
+        protected override IEnumerable<LogEntry> LoadLog()
         {
-            return new LogEntry<TCommand>[0];
+            return new LogEntry[0];
         }
 
         protected override void RemoveLogStartingFrom(int index)
@@ -25,7 +25,7 @@ namespace Inceptum.Raft
              
         }
 
-        protected override void AppendLog(params LogEntry<TCommand>[] logEntries)
+        protected override void AppendLog(params LogEntry[] logEntries)
         {
             
         }

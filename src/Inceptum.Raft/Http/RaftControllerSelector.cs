@@ -11,7 +11,7 @@ namespace Inceptum.Raft.Http
 {
     //http://www.strathweb.com/2013/09/dynamic-per-controller-httpconfiguration-asp-net-web-api/
 
-    internal class RaftControllerSelector<TCommand> : IHttpControllerSelector
+    internal class RaftControllerSelector : IHttpControllerSelector
     {
         private readonly IHttpControllerSelector m_ControllerSelector;
         private readonly HttpControllerDescriptor m_RaftControllerDescriptor;
@@ -37,7 +37,7 @@ namespace Inceptum.Raft.Http
             controllerSettings.Formatters.Remove(controllerSettings.Formatters.XmlFormatter);
             var constructor = typeof(HttpConfiguration).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(HttpConfiguration), typeof(HttpControllerSettings) }, null);
             var config = (HttpConfiguration)constructor.Invoke(new object[] { configuration, controllerSettings });
-            return new HttpControllerDescriptor(config, "Raft", typeof(RaftController<TCommand>));
+            return new HttpControllerDescriptor(config, "Raft", typeof(RaftController));
         }
 
         public HttpControllerDescriptor SelectController(HttpRequestMessage request)

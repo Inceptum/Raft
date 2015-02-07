@@ -9,10 +9,10 @@ namespace Inceptum.Raft
     /// <summary>
     /// Raft node persistent state
     /// </summary>
-    public abstract class PersistentStateBase<TCommand>
+    public abstract class PersistentStateBase
     {
         private long m_CurrentTerm;
-        private readonly List<LogEntry<TCommand>> m_Log;
+        private readonly List<LogEntry> m_Log;
         private string m_VotedFor;
 
         /// <summary>
@@ -60,14 +60,14 @@ namespace Inceptum.Raft
         /// <value>
         /// The log.
         /// </value>
-        public IList<LogEntry<TCommand>> Log
+        public IList<LogEntry> Log
         {
-            get { return new ReadOnlyCollection<LogEntry<TCommand>>(m_Log); }
+            get { return new ReadOnlyCollection<LogEntry>(m_Log); }
         }
 
         protected PersistentStateBase()
         {
-            m_Log = new List<LogEntry<TCommand>>();
+            m_Log = new List<LogEntry>();
         }
 
 
@@ -102,16 +102,16 @@ namespace Inceptum.Raft
             return true;
         }
 
-        public void Append(IEnumerable<LogEntry<TCommand>> entries)
+        public void Append(IEnumerable<LogEntry> entries)
         {
-            var logEntries = entries.Select(e => new LogEntry<TCommand>(e.Term, e.Command)).ToArray();
+            var logEntries = entries.Select(e => new LogEntry(e.Term, e.Command)).ToArray();
             AppendLog(logEntries);
             m_Log.AddRange(logEntries);
         }
 
-        public TaskCompletionSource<object> Append(TCommand command)
+        public TaskCompletionSource<object> Append(object command)
         {
-            var logEntry = new LogEntry<TCommand>(CurrentTerm, command);
+            var logEntry = new LogEntry(CurrentTerm, command);
             AppendLog(logEntry);
             m_Log.Add(logEntry);
             return logEntry.Completion;
@@ -125,7 +125,7 @@ namespace Inceptum.Raft
             return lastEntry.Term < lastLogTerm || (lastEntry.Term == lastLogTerm && lastLogIndex >= m_Log.Count - 1);
         }
 
-        public IEnumerable<LogEntry<TCommand>> GetRange(int index, int entriesCount)
+        public IEnumerable<LogEntry> GetRange(int index, int entriesCount)
         {
             return   m_Log.GetRange(index, entriesCount);
         }
@@ -134,9 +134,9 @@ namespace Inceptum.Raft
 
         protected abstract Tuple<long, string> LoadState();
         protected abstract void SaveState(long currentTerm, string votedFor);
-        protected abstract IEnumerable<LogEntry<TCommand>> LoadLog();
+        protected abstract IEnumerable<LogEntry> LoadLog();
         protected abstract void RemoveLogStartingFrom(int index);
-        protected abstract void AppendLog(params LogEntry<TCommand>[] logEntries);
+        protected abstract void AppendLog(params LogEntry[] logEntries);
 
     }
 }

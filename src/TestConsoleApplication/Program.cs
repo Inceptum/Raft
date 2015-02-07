@@ -12,12 +12,13 @@ using Inceptum.Raft.Http;
 
 namespace TestConsoleApplication
 {
-    class StateMachine : IStateMachine<int>
+    class StateMachine  
     {
         public int Value { get; set; }
         public void Apply(int command)
         {
-            Value += command;
+
+            Value +=  command;
         }
     }
     class Program
@@ -34,8 +35,8 @@ namespace TestConsoleApplication
             var transports = knownNodes.ToDictionary(n => n, n => new HttpTransport(knownNodes.ToDictionary(kn => kn, kn => new Uri(string.Format("{0}/{1}/",baseUrl, kn)))));
 
             var nodes = transports.Select(
-                   p => new Node<int>(
-                           new InMemoryPersistentState<int>(),
+                   p => new Node(
+                           new InMemoryPersistentState(),
                            new NodeConfiguration(p.Key, knownNodes.ToArray()) { ElectionTimeout = 300 },
                            p.Value,
                            new StateMachine()))
@@ -45,7 +46,7 @@ namespace TestConsoleApplication
             var config = new HttpSelfHostConfiguration(baseUrl);
             foreach (var t in transports)
             {
-                t.Value.ConfigureHost<HttpSelfHostConfiguration, int>(config,t.Key);
+                t.Value.ConfigureHost(config,t.Key);
             }
             var server = new HttpSelfHostServer(config);
             server.OpenAsync().Wait();
@@ -71,8 +72,8 @@ namespace TestConsoleApplication
                 var bus = new InMemoryBus();
 
                 var nodes = knownNodes.Select(
-                    id =>new Node<int>(
-                            new InMemoryPersistentState<int>(), 
+                    id =>new Node(
+                            new InMemoryPersistentState(), 
                             new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
                             new InMemoryTransport(id,bus), 
                             new StateMachine()))

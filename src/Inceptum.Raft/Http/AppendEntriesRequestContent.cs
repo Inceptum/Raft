@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace Inceptum.Raft.Http
 {
-    public class AppendEntriesRequestContent<TCommand> : HttpContent
+    public class AppendEntriesRequestContent : HttpContent
     {
-        private readonly LogEntry<TCommand>[] m_Entries;
+        private readonly LogEntry[] m_Entries;
         private readonly BinaryFormatter m_Formatter = new BinaryFormatter();
-        public AppendEntriesRequestContent(IEnumerable<LogEntry<TCommand>> entries)
+        public AppendEntriesRequestContent(IEnumerable<LogEntry> entries)
         {
             m_Entries = entries.ToArray();
         }

@@ -4,13 +4,13 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    abstract class NodeState<TCommand> : INodeState<TCommand>
+    abstract class NodeStateImpl : INodeState
     {
-        protected Node<TCommand> Node { get; private set; }
+        protected Node Node { get; private set; }
         public NodeState State { get; private set; }
         public DateTime EnterTime { get; private set; }
 
-        protected NodeState(Node<TCommand> node,NodeState state)
+        protected NodeStateImpl(Node node, NodeState state)
         {
             State = state;
             Node = node;
@@ -29,7 +29,7 @@ namespace Inceptum.Raft.States
             Node.Logger.Trace("Ignoring RequestVoteResponse since node is not a candidate");
             
         }
-        public abstract bool Handle(AppendEntriesRequest<TCommand> request);
+        public abstract bool Handle(AppendEntriesRequest request);
 
         public virtual void Handle( AppendEntriesResponse response)
         {
@@ -45,7 +45,7 @@ namespace Inceptum.Raft.States
             return rnd + electionTimeout;
         }
 
-        public virtual Task<object> Apply(TCommand command)
+        public virtual Task<object> Apply(object command)
         {
             throw new NotImplementedException();
         }

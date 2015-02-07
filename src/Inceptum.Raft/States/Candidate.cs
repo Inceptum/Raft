@@ -6,11 +6,11 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Candidate<TCommand> : NodeState<TCommand>
+    class Candidate : NodeStateImpl
     {
         private Dictionary<string, VoteResponse> m_Votes;
 
-        public Candidate(Node<TCommand> node)
+        public Candidate(Node node)
             : base(node,NodeState.Candidate)
         {
         }
@@ -68,13 +68,13 @@ namespace Inceptum.Raft.States
             if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
             {
                 var grantedBy = string.Join(", ",m_Votes.Values.Where(v => v.VoteGranted).Select(r => r.NodeId).ToArray());
-                Node.Logger.Debug("Vote granted may majority of nodes - {0}. Switching state to Leader", grantedBy);
+                Node.Logger.Debug("Vote granted by majority of nodes - {0}. Switching state to Leader", grantedBy);
                 Node.SwitchToLeader();
             }
 
         }
 
-        public override bool Handle(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest request)
         {
             //term in request is not newer than our (otherwise state should have been already changed to follower)
             return false;

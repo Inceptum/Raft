@@ -5,7 +5,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Inceptum.Raft
 {
-    public class FilePersistentState<TCommand> : PersistentStateBase<TCommand>,IDisposable
+    public class FilePersistentState : PersistentStateBase,IDisposable
     {
         readonly Dictionary<long,long> m_Map=new Dictionary<long, long>();
         private readonly BinaryFormatter m_Formatter;
@@ -48,7 +48,7 @@ namespace Inceptum.Raft
             m_StateFileStream.Flush();
         }
 
-        protected override void AppendLog(params LogEntry<TCommand>[] logEntries)
+        protected override void AppendLog(params LogEntry[] logEntries)
         {
             m_LogFileStream.Seek(0, SeekOrigin.End);
             foreach (var logEntry in logEntries)
@@ -60,14 +60,14 @@ namespace Inceptum.Raft
             m_LogFileStream.Flush();
         }
 
-        protected override IEnumerable<LogEntry<TCommand>> LoadLog()
+        protected override IEnumerable<LogEntry> LoadLog()
         {
             try
             {
                 m_LogFileStream.Seek(0, SeekOrigin.Begin);
                 while (m_LogFileStream.Position != m_LogFileStream.Length)
                 {
-                    yield return (LogEntry<TCommand>) m_Formatter.Deserialize(m_LogFileStream);
+                    yield return (LogEntry) m_Formatter.Deserialize(m_LogFileStream);
                 }
             }
             finally

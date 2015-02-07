@@ -18,16 +18,18 @@ namespace Inceptum.Raft
         Follower
     }
 
-    //TODO: real world transport (tests)
     //TODO: command accepting from clients
     //TODO: logging
     //TODO: restart node on state machine crash
     //TODO: snapshots
-    //TODO: get rid of <TCommand>
     //TODO: fluent configuration
     //TODO: Cluster membership changes
 
-    public class Node<TCommand> : IDisposable
+    //TODO: real world transport (tests)
+    //TODO[DONE]: get rid of <TCommand> 
+
+
+    public class Node : IDisposable
     {
         private readonly AutoResetEvent m_ResetTimeout = new AutoResetEvent(false);
         private readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
@@ -36,9 +38,9 @@ namespace Inceptum.Raft
         private readonly object m_SyncRoot = new object();
         private readonly Thread m_TimeoutHandlingThread;
         private readonly ITransport m_Transport;
-        private INodeState<TCommand> m_State;
+        private INodeState m_State;
         private int m_TimeoutBase;
-        private readonly StateMachineHost<TCommand> m_StateMachineHost;
+        private readonly StateMachineHost m_StateMachineHost;
         private string m_LeaderId;
         internal ILogger Logger { get; private set; }
 
@@ -51,7 +53,7 @@ namespace Inceptum.Raft
         /// <value>
         ///     The state of the persistent.
         /// </value>
-        internal PersistentStateBase<TCommand> PersistentState { get; private set; }
+        internal PersistentStateBase PersistentState { get; private set; }
 
         /// <summary>
         ///     Gets the index of highest log entry known to be committed (initialized to 0, increases monotonically)
@@ -93,7 +95,7 @@ namespace Inceptum.Raft
             get { return PersistentState.CurrentTerm; }
         }
 
-        public IEnumerable<LogEntry<TCommand>> LogEntries
+        public IEnumerable<LogEntry> LogEntries
         {
             get { return PersistentState.Log; }
         }
@@ -104,16 +106,16 @@ namespace Inceptum.Raft
         }
 
 
-        public Node(string path, NodeConfiguration configuration, ITransport transport, IStateMachine<TCommand> stateMachine)
-            :this(new FilePersistentState<TCommand>(path),configuration,transport,stateMachine)
+        public Node(string path, NodeConfiguration configuration, ITransport transport, object stateMachine)
+            :this(new FilePersistentState(path),configuration,transport,stateMachine)
         {
             
         }
 
-        public Node(PersistentStateBase<TCommand> persistentState, NodeConfiguration configuration, ITransport transport,IStateMachine<TCommand> stateMachine )
+        public Node(PersistentStateBase persistentState, NodeConfiguration configuration, ITransport transport,object stateMachine )
         {
             m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
-            m_StateMachineHost = new StateMachineHost<TCommand>(stateMachine, configuration.NodeId, persistentState);
+            m_StateMachineHost = new StateMachineHost(stateMachine, configuration.NodeId, persistentState);
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
@@ -128,13 +130,14 @@ namespace Inceptum.Raft
             {
                 subscribe<VoteRequest>(Handle),
                 subscribe<VoteResponse>(Handle),
-                subscribe<AppendEntriesRequest<TCommand>>(Handle),
+                subscribe<AppendEntriesRequest>(Handle),
                 subscribe<AppendEntriesResponse>(Handle)
             };
 
             m_TimeoutBase = Configuration.ElectionTimeout;
             CommitIndex = -1;
-            Logger =new LoggerWrapper<TCommand>(this, Configuration.LoggerFactory(GetType()));
+            Logger =new LoggerWrapper(this, Configuration.LoggerFactory(GetType()));
+            Logger.Info("Supported commands: {0}",m_StateMachineHost.SupportedCommands);
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -161,7 +164,7 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Start();
         }
 
-        public void Apply(TCommand command)
+        public void Apply(object command)
         {
             Task<object> apply;
             lock (m_SyncRoot)
@@ -218,13 +221,13 @@ namespace Inceptum.Raft
         internal void SwitchToCandidate()
         {
             LeaderId = null;
-            switchTo(new Candidate<TCommand>(this));
+            switchTo(new Candidate(this));
         }
 
         internal void SwitchToLeader()
         {
             LeaderId = Id;
-            switchTo(new Leader<TCommand>(this));
+            switchTo(new Leader(this));
         }
 
         private void switchToFollower(string leaderId)
@@ -234,10 +237,10 @@ namespace Inceptum.Raft
                 return;
 
             Logger.Debug("Switching state to Follower");
-            switchTo(new Follower<TCommand>(this));
+            switchTo(new Follower(this));
         }
 
-        private void switchTo(INodeState<TCommand> state)
+        private void switchTo(INodeState state)
         {
           
             m_State = state;
@@ -246,7 +249,7 @@ namespace Inceptum.Raft
         }
 
 
-        internal void AppendEntries(string node, AppendEntriesRequest<TCommand> request)
+        internal void AppendEntries(string node, AppendEntriesRequest request)
         {
             try
             {
@@ -294,7 +297,7 @@ namespace Inceptum.Raft
 
         #region Message Handlers
 
-        internal void Handle(AppendEntriesRequest<TCommand> request)
+        internal void Handle(AppendEntriesRequest request)
         {
 
             if (!Configuration.KnownNodes.Contains(request.LeaderId))

@@ -4,9 +4,9 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Follower<TCommand> : NodeState<TCommand>
+    class Follower : NodeStateImpl
     {
-        public Follower(Node<TCommand> node)
+        public Follower(Node node)
             : base(node,NodeState.Follower)
         {
         }
@@ -36,7 +36,7 @@ namespace Inceptum.Raft.States
                 Node.PersistentState.IsLogOlderOrEqual(voteRequest.LastLogIndex, voteRequest.LastLogTerm);
         }
 
-        public override bool Handle(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest request)
         {
             Node.Logger.Trace("Got HB from leader:{0}", Node.LeaderId);
 

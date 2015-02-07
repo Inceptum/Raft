@@ -8,7 +8,7 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.Http
 {
-    internal class RaftController<TCommand> : ApiController
+    internal class RaftController : ApiController
     {
         private HttpTransport m_Transport;
      
@@ -33,11 +33,11 @@ namespace Inceptum.Raft.Http
         } 
         
         [HttpPost]
-        public async Task<IHttpActionResult> AppendEntriesRequest([FromUri]AppendEntriesRequest<TCommand> appendEntriesRequest)
+        public async Task<IHttpActionResult> AppendEntriesRequest([FromUri]AppendEntriesRequest appendEntriesRequest)
         {
             var formatter = new BinaryFormatter();
             var stream = await Request.Content.ReadAsStreamAsync();
-            var logEntries = formatter.Deserialize(stream) as LogEntry<TCommand>[];
+            var logEntries = formatter.Deserialize(stream) as LogEntry[];
             appendEntriesRequest.Entries = logEntries;
             m_Transport.Accept(appendEntriesRequest);
 

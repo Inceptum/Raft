@@ -7,7 +7,7 @@ namespace Inceptum.Raft.Rpc
     /// <summary>
     /// Request for AppendEntries RPC. Invoked by leader to replicate log entries (§5.3); also used as heartbeat (§5.2)
     /// </summary>
-    public class AppendEntriesRequest<TCommand>
+    public class AppendEntriesRequest 
     {
         /// <summary>
         /// Gets or sets the leader’s term.
@@ -48,7 +48,7 @@ namespace Inceptum.Raft.Rpc
         /// The entries.
         /// </value>
         [JsonIgnore]
-        public IEnumerable<LogEntry<TCommand>> Entries { get; set; }
+        public IEnumerable<LogEntry> Entries { get; set; }
 
         /// <summary>
         /// Gets or sets the leader’s commit index.

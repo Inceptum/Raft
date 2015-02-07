@@ -6,7 +6,7 @@ using Inceptum.Raft.Rpc;
 
 namespace Inceptum.Raft.States
 {
-    class Leader<TCommand> : NodeState<TCommand>
+    class Leader : NodeStateImpl
     {
 
         /// <summary>
@@ -26,7 +26,7 @@ namespace Inceptum.Raft.States
 
         private Dictionary<string, int> LastSentIndex { get; set; }
 
-        public Leader(Node<TCommand> node)
+        public Leader(Node node)
             : base(node,NodeState.Leader)
         {
             NextIndexes = new Dictionary<string, int>();
@@ -61,7 +61,7 @@ namespace Inceptum.Raft.States
             appendEntries();
         }
 
-        public override Task<object> Apply(TCommand command)
+        public override Task<object> Apply(object command)
         {
             var completion = Node.PersistentState.Append(command);
             //TODO: proxy to leader
@@ -78,7 +78,7 @@ namespace Inceptum.Raft.States
             {
                 var nextIndex = NextIndexes[node];
 
-                IEnumerable<LogEntry<TCommand>> logEntries = new LogEntry<TCommand>[0];
+                IEnumerable<LogEntry> logEntries = new LogEntry[0];
                 if (nextIndex < Node.PersistentState.Log.Count)
                 {
                     var entriesCount = Math.Min(20, Node.PersistentState.Log.Count - nextIndex); //TODO: move batch size to config (20)
@@ -87,7 +87,7 @@ namespace Inceptum.Raft.States
                     Console.WriteLine("{2} > Sending {0} entries to {1}",entriesCount,node,Node.Id);
                 }
 
-                var request = new AppendEntriesRequest<TCommand>
+                var request = new AppendEntriesRequest
                 {
                     Term = Node.PersistentState.CurrentTerm,
                     Entries = logEntries,
@@ -106,7 +106,7 @@ namespace Inceptum.Raft.States
             return false;
         }
 
-        public override bool Handle(AppendEntriesRequest<TCommand> request)
+        public override bool Handle(AppendEntriesRequest request)
         {
             //Since state is not sitched to follower, requester term is older or same - decline
             return false;

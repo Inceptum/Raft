@@ -19,24 +19,24 @@ namespace Inceptum.Raft.Tests
 
 
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
-                persistentState.Append(new []{new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3)});
+                persistentState.Append(new []{new LogEntry(1, 1), new LogEntry(1, 2), new LogEntry(2, 3)});
             }
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
-                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2), new LogEntry<int>(2, 3) }),"Log was not restored correctly");
+                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry(1, 1), new LogEntry(1, 2), new LogEntry(2, 3) }),"Log was not restored correctly");
             }
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
                 persistentState.DeleteEntriesAfter(1);
             }
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
-                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry<int>(1, 1), new LogEntry<int>(1, 2)}), "Truncated log was not restored correctly");
+                Assert.That(persistentState.Log, Is.EquivalentTo(new[] { new LogEntry(1, 1), new LogEntry(1, 2)}), "Truncated log was not restored correctly");
             }
 
         }
@@ -51,13 +51,13 @@ namespace Inceptum.Raft.Tests
 
 
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
                 persistentState.CurrentTerm=10;
                 persistentState.VotedFor="some node";
             }
 
-            using (var persistentState = new FilePersistentState<int>(tempPath))
+            using (var persistentState = new FilePersistentState(tempPath))
             {
                 Assert.That(persistentState.CurrentTerm, Is.EqualTo(10), "Term was not restored correctly");
                 Assert.That(persistentState.VotedFor, Is.EqualTo("some node"), "Term was not restored correctly");

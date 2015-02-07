@@ -2,12 +2,12 @@
 
 namespace Inceptum.Raft.Logging
 {
-    internal class LoggerWrapper<TCommand>:ILogger
+    internal class LoggerWrapper:ILogger
     {
         private readonly ILogger m_Logger;
-        private readonly Node<TCommand> m_Node;
+        private readonly Node m_Node;
 
-        public LoggerWrapper(Node<TCommand> node,ILogger logger )
+        public LoggerWrapper(Node node,ILogger logger )
         {
             m_Node = node;
             m_Logger = logger;

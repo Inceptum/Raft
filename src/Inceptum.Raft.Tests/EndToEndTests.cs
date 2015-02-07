@@ -7,7 +7,7 @@ using NUnit.Framework;
 
 namespace Inceptum.Raft.Tests
 {
-    class StateMachine:IStateMachine<int>
+    class StateMachine
     {
         private readonly Action m_BeforeApply;
 
@@ -41,7 +41,7 @@ namespace Inceptum.Raft.Tests
         {
             const int electionTimeout = 150;
             var nodes = m_KnownNodes.Select(
-                id => new Node<int>(new InMemoryPersistentState<int>(),
+                id => new Node(new InMemoryPersistentState(),
                                     new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, 
                                     new InMemoryTransport(id),new StateMachine()))
                 .ToList();
@@ -72,7 +72,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
+                    new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
                         new InMemoryTransport(id), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
@@ -101,7 +101,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k=>k,v=>new StateMachine());
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
+                    new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
                         new InMemoryTransport(id, bus), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
@@ -149,7 +149,7 @@ namespace Inceptum.Raft.Tests
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
             var nodes = m_KnownNodes.Select(
                 id =>
-                    new Node<int>(new InMemoryPersistentState<int>(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                    new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
                         new InMemoryTransport(id), stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());

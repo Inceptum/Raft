@@ -14,8 +14,7 @@ namespace Inceptum.Raft.Tests
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 10000 };
             var bus = mockTransport();
-            var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
-            using (var node = new Node<int>(new InMemoryPersistentState<int>(), nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine))
+            using (var node = new Node(new InMemoryPersistentState(), nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
             {
                 node.Start();
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Node state after start is not follower");
@@ -26,11 +25,11 @@ namespace Inceptum.Raft.Tests
         [Test(Description = "If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)")]
         public void UpdateTermFromIncommingMessagesTest()
         {
-            using (var node = createFollower(new InMemoryPersistentState<int>(){CurrentTerm = 0}))
+            using (var node = createFollower(new InMemoryPersistentState(){CurrentTerm = 0}))
             {
                 node.Start();
                 node.SwitchToLeader();
-                node.Handle(new AppendEntriesRequest<int>() { Term = 1 ,LeaderId = "nodeA"});
+                node.Handle(new AppendEntriesRequest() { Term = 1 ,LeaderId = "nodeA"});
                 Assert.That(node.CurrentTerm, Is.EqualTo(1), "Term was not updated from AppendEntriesRequest");
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Has not converted to Follower on AppendEntriesRequest with newer term");
                 node.SwitchToLeader();
@@ -48,12 +47,11 @@ namespace Inceptum.Raft.Tests
             }
         }
 
-        private Node<int> createFollower(InMemoryPersistentState<int> persistentState)
+        private Node createFollower(InMemoryPersistentState persistentState)
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
-            var stateMachine = MockRepository.GenerateMock<IStateMachine<int>>();
             var bus = mockTransport();
-            return new Node<int>(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), stateMachine);
+            return new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object());
 
         }
 
@@ -63,7 +61,7 @@ namespace Inceptum.Raft.Tests
             var transport = MockRepository.GenerateMock<IInMemoryBus>();
             transport.Expect(t => t.Subscribe<VoteRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<VoteResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
-            transport.Expect(t => t.Subscribe<AppendEntriesRequest<int>>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
+            transport.Expect(t => t.Subscribe<AppendEntriesRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             return transport;
         }

@@ -70,7 +70,7 @@ namespace Inceptum.Raft
             m_NodeId = nodeId;
         }
  
-        public void Send<T>(string to, AppendEntriesRequest<T> message)
+        public void Send(string to, AppendEntriesRequest message)
         {
             m_Bus.Send(m_NodeId, to, message);
         }
