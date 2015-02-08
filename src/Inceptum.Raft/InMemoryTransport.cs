@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Inceptum.Raft;
 using Inceptum.Raft.Rpc;
 
@@ -90,9 +91,14 @@ namespace Inceptum.Raft
             m_Bus.Send(m_NodeId, to, message);
         }
 
-        public IDisposable Subscribe<T>(Action<T> handler)
+        public Task<object> Send(string to, ApplyCommadRequest message)
         {
-           return m_Bus.Subscribe(m_NodeId, handler);
+            throw new NotImplementedException();
+        }
+
+        public IDisposable Subscribe<T>(Func<T, Task<object>> handler)
+        {
+            return m_Bus.Subscribe(m_NodeId,(T t)=>handler(t));
         }
     }
 

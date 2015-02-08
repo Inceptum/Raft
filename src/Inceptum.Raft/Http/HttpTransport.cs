@@ -14,7 +14,7 @@ namespace Inceptum.Raft.Http
 {
     public class HttpTransport:ITransport,IDisposable
     {
-        readonly Dictionary< Type , Action<object>> m_Subscriptions = new Dictionary<Type, Action<object>>();
+        readonly Dictionary< Type , Func<object,Task<object>>> m_Subscriptions = new Dictionary<Type, Func<object, Task<object>>>();
         private readonly Dictionary<string, Uri> m_Endpoints;
         private readonly ConcurrentDictionary<Uri, ConcurrentQueue<HttpClient>> m_ClientsCache = new ConcurrentDictionary<Uri, ConcurrentQueue<HttpClient>>();
 
@@ -24,24 +24,25 @@ namespace Inceptum.Raft.Http
             m_Endpoints = endpoints;
         }
 
-        internal void Accept<T>(T message)
+        internal async Task<object> Accept<T>(T message)
         {
-            Action<object> handler;
+            Func<object, Task<object>> handler;
             var key = typeof (T);
             lock (m_Subscriptions)
             {
                 if (!m_Subscriptions.TryGetValue(key,out handler))
-                    return;
+                    return null;
             }
 
             //TODO: exception handling
-            handler(message);
+            await handler(message);
+            return null;
         }
 
         public IDisposable RunHost(string baseUrl)
         {
             var config = new HttpSelfHostConfiguration(baseUrl);
-            var server = new HttpSelfHostServer(ConfigureHost<HttpSelfHostConfiguration>(config));
+            var server = new HttpSelfHostServer(ConfigureHost(config));
             server.OpenAsync().Wait();
             return ActionDisposable.Create(() => server.CloseAsync().Wait());
         }
@@ -63,7 +64,7 @@ namespace Inceptum.Raft.Http
             return config;
         }
 
-        public IDisposable Subscribe<T>(  Action<T> handler)
+        public IDisposable Subscribe<T>(Func<T, Task<object>> handler)
         {
             var key =   typeof(T);
             lock (m_Subscriptions)
@@ -122,10 +123,20 @@ namespace Inceptum.Raft.Http
 
         }
 
-
-        private void send (Uri baseUri, Func<HttpClient,Task<HttpResponseMessage>> sendRequest)
+        public async Task<object> Send(string to, ApplyCommadRequest message)
         {
-            var queue=m_ClientsCache.GetOrAdd(baseUri, _ => new ConcurrentQueue<HttpClient>());
+            Uri baseUri;
+            if (!m_Endpoints.TryGetValue(to, out baseUri))
+                throw new InvalidOperationException(string.Format("Uri for node {0} is not provided", to));
+            var requestUri = string.Format("raft/Command");
+            await send(baseUri, client => client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
+            return Task.FromResult<object>(null);
+        }
+
+
+        private async Task<HttpResponseMessage> send(Uri baseUri, Func<HttpClient, Task<HttpResponseMessage>> sendRequest)
+        {
+            var queue = m_ClientsCache.GetOrAdd(baseUri, _ => new ConcurrentQueue<HttpClient>());
             HttpClient client;
             if (queue.TryDequeue(out client) == false)
             {
@@ -134,15 +145,14 @@ namespace Inceptum.Raft.Http
                     BaseAddress = baseUri
                 };
             }
-            sendRequest(client).ContinueWith(task =>
-            {
-                if (task.Result.StatusCode != HttpStatusCode.OK)
-                {
-                    //TODO: log
-                }
-                queue.Enqueue(client);
-            });
+            var response = await sendRequest(client);
 
+            if (response.StatusCode != HttpStatusCode.OK)
+            {
+                //TODO: log
+            }
+            queue.Enqueue(client);
+            return response;
         }
 
 

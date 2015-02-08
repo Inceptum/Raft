@@ -1,3 +1,4 @@
+using System;
 using System.Net.Http;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading;
@@ -47,6 +48,23 @@ namespace Inceptum.Raft.Http
         public IHttpActionResult AppendEntriesResponse([FromUri]AppendEntriesResponse appendEntriesResponse)
         {
             m_Transport.Accept(appendEntriesResponse);
+            return Ok();
+        }        
+        
+        [HttpPost]
+        public async Task<IHttpActionResult> Command()
+        {
+            var formatter = new BinaryFormatter();
+            var stream = await Request.Content.ReadAsStreamAsync();
+            var command = formatter.Deserialize(stream);
+            try
+            {
+                await m_Transport.Accept(new ApplyCommadRequest { Command = command });
+            }
+            catch (Exception e)
+            {
+                return InternalServerError(e);
+            }
             return Ok();
         }
     }

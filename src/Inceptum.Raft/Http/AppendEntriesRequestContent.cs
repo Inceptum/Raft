@@ -29,5 +29,29 @@ namespace Inceptum.Raft.Http
             length = -1;
             return false;
         }
+    }   
+    
+    
+    public class ApplyCommandContent : HttpContent
+    {
+        private readonly object m_Command;
+        private readonly BinaryFormatter m_Formatter = new BinaryFormatter();
+        public ApplyCommandContent(object command)
+        {
+            m_Command = command;
+        }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext context)
+        {
+            //TODO: need something better than just binary serialized data in post content
+            m_Formatter.Serialize(stream, m_Command);
+            return Task.FromResult(1);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = -1;
+            return false;
+        }
     }
 }

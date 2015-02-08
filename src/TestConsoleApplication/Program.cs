@@ -15,10 +15,18 @@ namespace TestConsoleApplication
     class StateMachine  
     {
         public int Value { get; set; }
+        public string Node { get; set; }
+
+        public StateMachine(string node)
+        {
+            Node = node;
+        }
+
         public void Apply(int command)
         {
-
+            Thread.Sleep(1000);
             Value +=  command;
+            Console.WriteLine("{0}:applying  {1}. New Value is {2}", Node, command, Value);
         }
     }
     class Program
@@ -39,7 +47,7 @@ namespace TestConsoleApplication
                            new InMemoryPersistentState(),
                            new NodeConfiguration(p.Key, knownNodes.ToArray()) { ElectionTimeout = 300 },
                            p.Value,
-                           new StateMachine()))
+                           new StateMachine(p.Key)))
                    .ToArray();
 
   
@@ -56,8 +64,22 @@ namespace TestConsoleApplication
                 node.Start();
             }
 
+            string input = null;
+            while (input  != "exit")
+            {
+                input=Console.ReadLine();
+                int command;
+                if (int.TryParse(input, out command))
+                {
+                    nodes.First().Apply(command);
+                    Console.WriteLine("Applied {0}",command);
+                }
+            }
+            foreach (var node in nodes)
+            {
+                node.Dispose();
+            }
 
-            Console.ReadLine();
             server.CloseAsync().Wait();
 
         }
@@ -76,7 +98,7 @@ namespace TestConsoleApplication
                             new InMemoryPersistentState(), 
                             new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
                             new InMemoryTransport(id,bus), 
-                            new StateMachine()))
+                            new StateMachine(id)))
                     .ToArray();
 
                 var start = DateTime.Now;

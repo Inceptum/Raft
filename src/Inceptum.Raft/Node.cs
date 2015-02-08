@@ -126,12 +126,20 @@ namespace Inceptum.Raft
                 Priority = ThreadPriority.AboveNormal
             };
 
+            var disposable = m_Transport.Subscribe<ApplyCommadRequest>(request =>
+            {
+                lock (m_SyncRoot)
+                {
+                    return m_State.Apply(request.Command);
+                }
+            });
             m_Subscriptions = new[]
             {
                 subscribe<VoteRequest>(Handle),
                 subscribe<VoteResponse>(Handle),
                 subscribe<AppendEntriesRequest>(Handle),
-                subscribe<AppendEntriesResponse>(Handle)
+                subscribe<AppendEntriesResponse>(Handle),
+                disposable
             };
 
             m_TimeoutBase = Configuration.ElectionTimeout;
@@ -143,19 +151,24 @@ namespace Inceptum.Raft
         private IDisposable subscribe<T>(Action<T> handler)
         {
             return m_Transport.Subscribe<T>(
-                message => Task.Factory.StartNew(() =>
+                message =>
                 {
-                    lock (m_SyncRoot)
+                    Task.Factory.StartNew(() =>
                     {
-                        try{
-                            handler(message);
-                        }
-                        catch (Exception e)
+                        lock (m_SyncRoot)
                         {
-                            Logger.Debug(e,"Failed to handle {0}", typeof(T).Name);
+                            try
+                            {
+                                handler(message);
+                            }
+                            catch (Exception e)
+                            {
+                                Logger.Debug(e, "Failed to handle {0}", typeof (T).Name);
+                            }
                         }
-                    }
-                }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler));
+                    }, CancellationToken.None, TaskCreationOptions.None, m_Scheduler);
+                    return Task.FromResult<object>(null);
+                });
         }
 
         public void Start()
@@ -259,7 +272,6 @@ namespace Inceptum.Raft
             {
                 Logger.Trace(e,"Failed to send AppendEntriesRequest message  to node {0} ", node);
             }
-            
         }
 
         internal void RequestVotes()
@@ -421,6 +433,13 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
             m_StateMachineHost.Dispose();
+        }
+
+        public Task<object> SendCommandToLeader(object command)
+        {
+            if (LeaderId == null)
+                throw new InvalidOperationException("Can not process Command unless Leader is selected");
+            return m_Transport.Send(LeaderId,new ApplyCommadRequest{Command = command});
         }
     }
 }

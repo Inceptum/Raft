@@ -47,7 +47,7 @@ namespace Inceptum.Raft.States
 
         public virtual Task<object> Apply(object command)
         {
-            throw new NotImplementedException();
+            return Node.SendCommandToLeader(command);
         }
     }
 }

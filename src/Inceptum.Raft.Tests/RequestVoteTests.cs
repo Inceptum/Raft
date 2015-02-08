@@ -193,6 +193,7 @@ namespace Inceptum.Raft.Tests
             transport.Expect(t => t.Subscribe<VoteResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             transport.Expect(t => t.Subscribe<AppendEntriesResponse>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
+            transport.Expect(t => t.Subscribe<ApplyCommadRequest>(null, null)).IgnoreArguments().Return(ActionDisposable.Create(() => { }));
             return transport;
         }
     }
