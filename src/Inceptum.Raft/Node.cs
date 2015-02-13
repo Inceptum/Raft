@@ -18,12 +18,12 @@ namespace Inceptum.Raft
         Follower
     }
 
-    //TODO: restart node on state machine crash
     //TODO: snapshots
     //TODO: logging
     //TODO: fluent configuration
     //TODO: Cluster membership changes
 
+    //TODO: restart node on state machine crash (tests/refactoring)
     //TODO: command accepting from clients (tests)
     //TODO: real world transport (tests)
     //TODO[DONE]: get rid of <TCommand> 
