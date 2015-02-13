@@ -77,10 +77,14 @@ namespace Inceptum.Raft
             var state = LoadState();
             m_CurrentTerm = state.Item1;
             m_VotedFor = state.Item2;
-
         }
 
 
+        public void Reload()
+        {
+            m_Log.Clear();
+            Init();
+        }
         public bool EntryTermMatches(int prevLogIndex, long prevLogTerm)
         {
             if (prevLogIndex < 0 && m_Log.Count == 0)

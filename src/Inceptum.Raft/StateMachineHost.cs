@@ -17,6 +17,7 @@ namespace Inceptum.Raft
         private readonly PersistentStateBase m_PersistentState;
 
         readonly Dictionary<Type, Action<object>> m_Handlers=new Dictionary<Type, Action<object>>();
+        private volatile bool m_IsCorrupted;
 
         public long LastApplied
         {
@@ -64,12 +65,12 @@ namespace Inceptum.Raft
             var lambda = (Expression<Action<object>>)Expression.Lambda(call, command);
             m_Handlers.Add(commandType,lambda.Compile());
         }
-        public int Apply(int startIndex,int endIndex)
+        public int Apply(int startIndex,int endIndex, Action<Exception> onStateMachineFail)
         {
             //TODO: exception handling. Crashed command processing should restart the node (https://groups.google.com/forum/#!searchin/raft-dev/state$20machinhe$20fault/raft-dev/6BauqBX6yEs/W6pZFdKcLckJ)
             //TODO: index should be long
             var processedIndex = startIndex - 1;
-            for (var i = startIndex; i <= Math.Min(endIndex, m_PersistentState.Log.Count - 1); i++)
+            for (var i = startIndex; i <= Math.Min(endIndex, m_PersistentState.Log.Count - 1) && !m_IsCorrupted; i++)
             {
                 var logEntry=m_PersistentState.Log[i];
                 var index = i;
@@ -78,9 +79,19 @@ namespace Inceptum.Raft
                 //TODO: crash if command is not supported !!!
                 Task.Factory.StartNew(() =>
                 {
-                    handler(logEntry.Command);
-                    logEntry.Completion.SetResult(null); //report completion
-                    Interlocked.Exchange(ref m_LastApplied, index);
+                    if (m_IsCorrupted)
+                        return;
+                    try
+                    {
+                        handler(logEntry.Command);
+                        logEntry.Completion.SetResult(null); //report completion
+                        Interlocked.Exchange(ref m_LastApplied, index);
+                    }
+                    catch (Exception e)
+                    {
+                        m_IsCorrupted = true;
+                        onStateMachineFail(e);
+                    }
                 }, CancellationToken.None, TaskCreationOptions.None, m_StateMachineScheduler);
                 processedIndex = i;
             }

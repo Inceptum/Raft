@@ -40,27 +40,27 @@ namespace Inceptum.Raft.Logging
 
         public void Fatal(Exception ex, string format, params object[] args)
         {
-            m_Logger.Fatal(getPrefix(), getPrefix() + format, args);
+            m_Logger.Fatal(ex, getPrefix() + format, args);
         }
 
         public void Error(Exception ex, string format, params object[] args)
         {
-            m_Logger.Error(getPrefix(), getPrefix() + format, args);
+            m_Logger.Error(ex, getPrefix() + format, args);
         }
 
         public void Info(Exception ex, string format, params object[] args)
         {
-            m_Logger.Info(getPrefix(), getPrefix() + format, args);
+            m_Logger.Info(ex, getPrefix() + format, args);
         }
 
         public void Debug(Exception ex, string format, params object[] args)
         {
-            m_Logger.Debug(getPrefix(), getPrefix() + format, args);
+            m_Logger.Debug(ex, getPrefix() + format, args);
         }
 
         public void Trace(Exception ex, string format, params object[] args)
         {
-            m_Logger.Trace(getPrefix(), getPrefix() + format, args);
+            m_Logger.Trace(ex, getPrefix() + format, args);
         }
 
         private string getPrefix()

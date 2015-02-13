@@ -129,7 +129,7 @@ namespace Inceptum.Raft.Http
             if (!m_Endpoints.TryGetValue(to, out baseUri))
                 throw new InvalidOperationException(string.Format("Uri for node {0} is not provided", to));
             var requestUri = string.Format("raft/Command");
-            await send(baseUri, client => client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
+            await send(baseUri, async client => await client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
             return Task.FromResult<object>(null);
         }
 
@@ -145,8 +145,8 @@ namespace Inceptum.Raft.Http
                     BaseAddress = baseUri
                 };
             }
-            var response = await sendRequest(client);
-
+            HttpResponseMessage response=await sendRequest(client);
+           
             if (response.StatusCode != HttpStatusCode.OK)
             {
                 //TODO: log

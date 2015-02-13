@@ -12,8 +12,9 @@ using Inceptum.Raft.Http;
 
 namespace TestConsoleApplication
 {
-    class StateMachine  
+    class StateMachine
     {
+        private static bool hasFailed = false;
         public int Value { get; set; }
         public string Node { get; set; }
 
@@ -24,7 +25,13 @@ namespace TestConsoleApplication
 
         public void Apply(int command)
         {
-           // Thread.Sleep(1000);
+            if (Node == "node1" && command == 3 && !hasFailed)
+            {
+                hasFailed = true;
+                Console.WriteLine("{0}:oops!", Node);
+                throw new Exception("oops");
+            }
+            // Thread.Sleep(1000);
             Value +=  command;
             Console.WriteLine("{0}:applying  {1}. New Value is {2}", Node, command, Value);
         }
@@ -45,6 +52,7 @@ namespace TestConsoleApplication
             bool needPrefix = true;
             if (int.TryParse(readLine, out number))
             {
+                Console.Title = "node"+number;
                 needPrefix = false;
                 baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9000+number);
                 transports = new Dictionary<string, HttpTransport> { { "node" + number, new HttpTransport(
@@ -59,7 +67,11 @@ namespace TestConsoleApplication
                            new InMemoryPersistentState(),
                            new NodeConfiguration(p.Key, knownNodes.ToArray()) { ElectionTimeout = 300 },
                            p.Value,
-                           new StateMachine(p.Key)))
+                           () =>
+                           {
+                               string key = p.Key;
+                               return new StateMachine(key);
+                           }))
                    .ToArray();
 
             Console.WriteLine(baseUrl);
@@ -83,7 +95,16 @@ namespace TestConsoleApplication
                 int command;
                 if (int.TryParse(input, out command))
                 {
-                    nodes.First().Apply(command);
+                    try
+                    {
+                        nodes.First().Apply(command);
+                    }
+                    catch (Exception ex)
+                    {
+
+                        Console.WriteLine("Command failed: "+ex.ToString());
+                    }
+                    
                     Console.WriteLine("Applied {0}",command);
                 }
             }
@@ -109,8 +130,12 @@ namespace TestConsoleApplication
                     id =>new Node(
                             new InMemoryPersistentState(), 
                             new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                            new InMemoryTransport(id,bus), 
-                            new StateMachine(id)))
+                            new InMemoryTransport(id,bus),
+                            () =>
+                            {
+                                string s = id;
+                                return new StateMachine(s);
+                            }))
                     .ToArray();
 
                 var start = DateTime.Now;

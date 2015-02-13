@@ -92,7 +92,7 @@ namespace Inceptum.Raft.Tests
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -107,7 +107,7 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -122,7 +122,7 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
             var bus = mockTransport();
-             using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -141,7 +141,7 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -156,7 +156,7 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 Thread.Sleep(200);
@@ -173,7 +173,7 @@ namespace Inceptum.Raft.Tests
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Anything, Arg<VoteResponse>.Is.Anything)).Do(send).Repeat.Times(voteRequests.Count());
 
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 foreach (var request in voteRequests)

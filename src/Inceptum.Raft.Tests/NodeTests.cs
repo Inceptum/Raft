@@ -14,7 +14,7 @@ namespace Inceptum.Raft.Tests
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 10000 };
             var bus = mockTransport();
-            using (var node = new Node(new InMemoryPersistentState(), nodeConfiguration, new InMemoryTransport("testedNode", bus), new object()))
+            using (var node = new Node(new InMemoryPersistentState(), nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
             {
                 node.Start();
                 Assert.That(node.State, Is.EqualTo(NodeState.Follower), "Node state after start is not follower");
@@ -51,7 +51,7 @@ namespace Inceptum.Raft.Tests
         {
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             var bus = mockTransport();
-            return new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new object());
+            return new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object());
 
         }
 

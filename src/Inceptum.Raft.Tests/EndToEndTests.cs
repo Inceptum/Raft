@@ -42,8 +42,8 @@ namespace Inceptum.Raft.Tests
             const int electionTimeout = 150;
             var nodes = m_KnownNodes.Select(
                 id => new Node(new InMemoryPersistentState(),
-                                    new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout }, 
-                                    new InMemoryTransport(id),new StateMachine()))
+                                    new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
+                                    new InMemoryTransport(id), () => new StateMachine()))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -73,7 +73,7 @@ namespace Inceptum.Raft.Tests
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        new InMemoryTransport(id), stateMachines[id]))
+                        new InMemoryTransport(id), () => stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -102,7 +102,7 @@ namespace Inceptum.Raft.Tests
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        new InMemoryTransport(id, bus), stateMachines[id]))
+                        new InMemoryTransport(id, bus), () => stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -150,7 +150,7 @@ namespace Inceptum.Raft.Tests
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                        new InMemoryTransport(id), stateMachines[id]))
+                        new InMemoryTransport(id), () => stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
             Thread.Sleep(electionTimeout * 5);

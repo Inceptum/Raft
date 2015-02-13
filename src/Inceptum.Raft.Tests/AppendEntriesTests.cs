@@ -91,7 +91,7 @@ namespace Inceptum.Raft.Tests
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Twice();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Twice();
 
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), new Object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), ()=>new Object()))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -131,7 +131,7 @@ namespace Inceptum.Raft.Tests
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Once();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Times(4).Do(send);
 
-            using (node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), new StateMachineMock(null)))
+            using (node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new StateMachineMock(null)))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -155,7 +155,7 @@ namespace Inceptum.Raft.Tests
             Action<string, string, AppendEntriesResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
-            var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), stateMachine);
+            var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => stateMachine);
             using (doNotDisposeNode?ActionDisposable.Create(() => { }):node)
             {
                 node.Start();

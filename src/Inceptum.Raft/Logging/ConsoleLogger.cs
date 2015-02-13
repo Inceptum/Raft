@@ -44,7 +44,7 @@ namespace Inceptum.Raft.Logging
 
         public void Fatal(Exception ex, string format, params object[] args)
         {
-            log("FATAL", format, args);
+            log("FATAL", ex,format, args);
         }
 
         public void Error(Exception ex, string format, params object[] args)
@@ -71,7 +71,7 @@ namespace Inceptum.Raft.Logging
 
         private void log(string level, string format, params object[] args)
         {
-            if(level!="DEBUG")
+            if (level == "TRACE")
                 return;
             
             Console.WriteLine("[{0:00},{1:HH:mm:ss.fff},{2}] {3} {4}",
@@ -84,7 +84,7 @@ namespace Inceptum.Raft.Logging
 
         private void log(string level, Exception ex, string format, params object[] args)
         {
-            if (level != "DEBUG")
+            if (level == "TRACE")
                 return;
 
             var sb = new StringBuilder();

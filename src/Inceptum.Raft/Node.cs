@@ -33,15 +33,17 @@ namespace Inceptum.Raft
     {
         private readonly AutoResetEvent m_ResetTimeout = new AutoResetEvent(false);
         private readonly ManualResetEvent m_Stop = new ManualResetEvent(false);
-        private readonly SingleThreadTaskScheduler m_Scheduler;
-        private readonly IDisposable[] m_Subscriptions;
+        private SingleThreadTaskScheduler m_Scheduler;
+        private IDisposable[] m_Subscriptions;
         private readonly object m_SyncRoot = new object();
-        private readonly Thread m_TimeoutHandlingThread;
+        private Thread m_TimeoutHandlingThread;
         private readonly ITransport m_Transport;
         private INodeState m_State;
         private int m_TimeoutBase;
-        private readonly StateMachineHost m_StateMachineHost;
+        private StateMachineHost m_StateMachineHost;
         private string m_LeaderId;
+        private readonly Func<object> m_StateMachineFactory;
+        private volatile bool m_IsStarted;
         internal ILogger Logger { get; private set; }
 
 
@@ -106,20 +108,33 @@ namespace Inceptum.Raft
         }
 
 
-        public Node(string path, NodeConfiguration configuration, ITransport transport, object stateMachine)
-            :this(new FilePersistentState(path),configuration,transport,stateMachine)
+        public Node(string path, NodeConfiguration configuration, ITransport transport, Func<object> stateMachineFactory)
+            : this(new FilePersistentState(path), configuration, transport, stateMachineFactory)
         {
             
         }
 
-        public Node(PersistentStateBase persistentState, NodeConfiguration configuration, ITransport transport,object stateMachine )
+        public Node(PersistentStateBase persistentState, NodeConfiguration configuration, ITransport transport,Func<object> stateMachineFactory )
         {
-            m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", configuration.NodeId));
-            m_StateMachineHost = new StateMachineHost(stateMachine, configuration.NodeId, persistentState);
+            m_StateMachineFactory = stateMachineFactory;
             m_Transport = transport;
             Id = configuration.NodeId;
             Configuration = configuration;
             PersistentState = persistentState;
+            m_TimeoutBase = Configuration.ElectionTimeout;
+            Logger =new LoggerWrapper(this, Configuration.LoggerFactory(GetType()));
+            restart();
+        }
+
+
+        private void restart()
+        {
+            stop();
+            CommitIndex = -1;
+            Logger.Info("Starting node {0}", Id);
+            m_StateMachineHost = new StateMachineHost(m_StateMachineFactory(), Configuration.NodeId, PersistentState);
+            Logger.Info("Supported commands: {0}", m_StateMachineHost.SupportedCommands);
+            m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", Id));
             m_TimeoutHandlingThread = new Thread(timeoutHandlingLoop)
             {
                 //Due to timeout logic it is significant to get execution context precisely
@@ -141,11 +156,7 @@ namespace Inceptum.Raft
                 subscribe<AppendEntriesResponse>(Handle),
                 disposable
             };
-
-            m_TimeoutBase = Configuration.ElectionTimeout;
-            CommitIndex = -1;
-            Logger =new LoggerWrapper(this, Configuration.LoggerFactory(GetType()));
-            Logger.Info("Supported commands: {0}",m_StateMachineHost.SupportedCommands);
+            m_IsStarted = true;
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -177,14 +188,13 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Start();
         }
 
-        public void Apply(object command)
+        public async void Apply(object command)
         {
-            Task<object> apply;
-            lock (m_SyncRoot)
+                await m_State.Apply(command); 
+            /*lock (m_SyncRoot)
             {
-                apply = m_State.Apply(command);
-            }
-            apply.Wait();
+
+            }*/
         }
  
 
@@ -296,9 +306,14 @@ namespace Inceptum.Raft
                 }
             }
         }
+
         internal void Commit(long leaderCommit)
         {
-            CommitIndex = m_StateMachineHost.Apply(CommitIndex + 1, (int) leaderCommit);
+            CommitIndex = m_StateMachineHost.Apply(CommitIndex + 1, (int) leaderCommit, e =>
+            {
+                Logger.Fatal(e,"Sate machine failed to process command. Restarting...");
+                ThreadPool.QueueUserWorkItem(state => restart());
+            });
         }
 
         internal long IncrementTerm()
@@ -311,7 +326,6 @@ namespace Inceptum.Raft
 
         internal void Handle(AppendEntriesRequest request)
         {
-
             if (!Configuration.KnownNodes.Contains(request.LeaderId))
             {
                 Logger.Trace("Got AppendEntriesRequest from unknown node {0}. Ignoring...", request.LeaderId);
@@ -425,6 +439,16 @@ namespace Inceptum.Raft
 
         public void Dispose()
         {
+            stop();
+        }
+
+        private void stop()
+        {
+            if(!m_IsStarted)
+                return;
+                
+            m_IsStarted = false;
+            Logger.Info("Stopping node {0}", Id);
             foreach (var subscription in m_Subscriptions)
             {
                 subscription.Dispose();
@@ -433,6 +457,8 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
             m_StateMachineHost.Dispose();
+            PersistentState.Reload();
+            Console.WriteLine("!!!");
         }
 
         public Task<object> SendCommandToLeader(object command)
