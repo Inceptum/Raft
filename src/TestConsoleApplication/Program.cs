@@ -24,7 +24,7 @@ namespace TestConsoleApplication
 
         public void Apply(int command)
         {
-            Thread.Sleep(1000);
+           // Thread.Sleep(1000);
             Value +=  command;
             Console.WriteLine("{0}:applying  {1}. New Value is {2}", Node, command, Value);
         }
@@ -35,12 +35,24 @@ namespace TestConsoleApplication
 
         private static void Main(string[] args)
         {
-            //   Test(150);
-            string baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9222);
-
             var knownNodes = Enumerable.Range(1, 3).Select(i => "node" + i);
 
-            var transports = knownNodes.ToDictionary(n => n, n => new HttpTransport(knownNodes.ToDictionary(kn => kn, kn => new Uri(string.Format("{0}/{1}/",baseUrl, kn)))));
+            string baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9222);
+            var transports = knownNodes.ToDictionary(n => n, n => new HttpTransport(knownNodes.ToDictionary(kn => kn, kn => new Uri(string.Format("{0}/{1}/", baseUrl, kn)))));
+
+            var readLine = Console.ReadLine();
+            int number;
+            bool needPrefix = true;
+            if (int.TryParse(readLine, out number))
+            {
+                needPrefix = false;
+                baseUrl = string.Format(@"{0}://localhost:{1}", "http", 9000+number);
+                transports = new Dictionary<string, HttpTransport> { { "node" + number, new HttpTransport(
+                    Enumerable.Range(1, 3).ToDictionary(kn => "node"+kn, kn => new Uri(string.Format("http://localhost:{0}/",9000+ kn)))) } };
+            }
+            //   Test(150);
+
+
 
             var nodes = transports.Select(
                    p => new Node(
@@ -50,11 +62,11 @@ namespace TestConsoleApplication
                            new StateMachine(p.Key)))
                    .ToArray();
 
-  
+            Console.WriteLine(baseUrl);
             var config = new HttpSelfHostConfiguration(baseUrl);
             foreach (var t in transports)
             {
-                t.Value.ConfigureHost(config,t.Key);
+                t.Value.ConfigureHost(config, needPrefix?t.Key:null);
             }
             var server = new HttpSelfHostServer(config);
             server.OpenAsync().Wait();

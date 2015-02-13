@@ -49,6 +49,7 @@
   <ItemGroup>
     <Compile Include="AppendEntriesTests.cs" />
     <Compile Include="EndToEndTests.cs" />
+    <Compile Include="FluentConfigurationTests.cs" />
     <Compile Include="InvestigationTests.cs" />
     <Compile Include="NodeTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
