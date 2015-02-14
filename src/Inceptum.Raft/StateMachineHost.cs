@@ -89,6 +89,7 @@ namespace Inceptum.Raft
                     }
                     catch (Exception e)
                     {
+                        logEntry.Completion.SetException(e);
                         m_IsCorrupted = true;
                         onStateMachineFail(e);
                     }
