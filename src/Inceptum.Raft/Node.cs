@@ -174,7 +174,7 @@ namespace Inceptum.Raft
             {
                 lock (m_SyncRoot)
                 {
-                    return m_State.Apply(request.Command);
+                    return Apply(request.Command);
                 }
             });
             m_Subscriptions = new[]

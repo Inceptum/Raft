@@ -127,7 +127,9 @@ namespace Inceptum.Raft.Http
         {
             Uri baseUri;
             if (!m_Endpoints.TryGetValue(to, out baseUri))
+            {
                 throw new InvalidOperationException(string.Format("Uri for node {0} is not provided", to));
+            }
             var requestUri = string.Format("raft/Command");
             await send(baseUri, async client => await client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
             return Task.FromResult<object>(null);
@@ -150,6 +152,7 @@ namespace Inceptum.Raft.Http
                 var response = await sendRequest(client);
                 if (response.StatusCode != HttpStatusCode.OK)
                 {
+                    Console.WriteLine(response);
                     //TODO: log
                 }
                 return response;
