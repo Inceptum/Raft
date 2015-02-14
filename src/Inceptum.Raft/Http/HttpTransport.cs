@@ -145,14 +145,25 @@ namespace Inceptum.Raft.Http
                     BaseAddress = baseUri
                 };
             }
-            HttpResponseMessage response=await sendRequest(client);
-           
-            if (response.StatusCode != HttpStatusCode.OK)
+            try
+            {
+                var response = await sendRequest(client);
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    //TODO: log
+                }
+                return response;
+            }
+            catch (Exception e)
             {
                 //TODO: log
+                //Exceptions are ignorerd since Raft protocol is ok with not delivered meassages
+                return null;
             }
-            queue.Enqueue(client);
-            return response;
+            finally
+            {
+                queue.Enqueue(client);
+            }
         }
 
 

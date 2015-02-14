@@ -64,11 +64,10 @@ namespace Inceptum.Raft.States
         public override Task<object> Apply(object command)
         {
             var completion = Node.PersistentState.Append(command);
-            //TODO: proxy to leader
             appendEntries();
             Node.ResetTimeout();
 
-            //TODO: If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
+            //If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
             return completion.Task;
         }
 

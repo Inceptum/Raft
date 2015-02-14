@@ -63,7 +63,7 @@ namespace Inceptum.Raft.Http
             }
             catch (Exception e)
             {
-                return BadRequest();//InternalServerError(e);
+                return InternalServerError(e);
             }
             return Ok();
         }

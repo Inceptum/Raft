@@ -123,40 +123,13 @@ namespace Inceptum.Raft
             PersistentState = persistentState;
             m_TimeoutBase = Configuration.ElectionTimeout;
             Logger =new LoggerWrapper(this, Configuration.LoggerFactory(GetType()));
-            restart();
         }
 
 
         private void restart()
         {
             stop();
-            CommitIndex = -1;
-            Logger.Info("Starting node {0}", Id);
-            m_StateMachineHost = new StateMachineHost(m_StateMachineFactory(), Configuration.NodeId, PersistentState);
-            Logger.Info("Supported commands: {0}", m_StateMachineHost.SupportedCommands);
-            m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", Id));
-            m_TimeoutHandlingThread = new Thread(timeoutHandlingLoop)
-            {
-                //Due to timeout logic it is significant to get execution context precisely
-                Priority = ThreadPriority.AboveNormal
-            };
-
-            var disposable = m_Transport.Subscribe<ApplyCommadRequest>(request =>
-            {
-                lock (m_SyncRoot)
-                {
-                    return m_State.Apply(request.Command);
-                }
-            });
-            m_Subscriptions = new[]
-            {
-                subscribe<VoteRequest>(Handle),
-                subscribe<VoteResponse>(Handle),
-                subscribe<AppendEntriesRequest>(Handle),
-                subscribe<AppendEntriesResponse>(Handle),
-                disposable
-            };
-            m_IsStarted = true;
+            Start();
         }
 
         private IDisposable subscribe<T>(Action<T> handler)
@@ -185,12 +158,40 @@ namespace Inceptum.Raft
         public void Start()
         {
             switchToFollower(null);
+            m_Stop.Reset();
+            CommitIndex = -1;
+            Logger.Info("Starting node {0}", Id);
+            m_StateMachineHost = new StateMachineHost(m_StateMachineFactory(), Configuration.NodeId, PersistentState);
+            Logger.Info("Supported commands: {0}", m_StateMachineHost.SupportedCommands);
+            m_Scheduler = new SingleThreadTaskScheduler(ThreadPriority.AboveNormal, string.Format("Raft Message and Timeout Thread {0}", Id));
+            m_TimeoutHandlingThread = new Thread(timeoutHandlingLoop)
+            {
+                //Due to timeout logic it is significant to get execution context precisely
+                Priority = ThreadPriority.AboveNormal
+            };
+
+            var disposable = m_Transport.Subscribe<ApplyCommadRequest>(request =>
+            {
+                lock (m_SyncRoot)
+                {
+                    return m_State.Apply(request.Command);
+                }
+            });
+            m_Subscriptions = new[]
+            {
+                subscribe<VoteRequest>(Handle),
+                subscribe<VoteResponse>(Handle),
+                subscribe<AppendEntriesRequest>(Handle),
+                subscribe<AppendEntriesResponse>(Handle),
+                disposable
+            };
+            m_IsStarted = true;
             m_TimeoutHandlingThread.Start();
         }
 
-        public async void Apply(object command)
+        public async Task<object> Apply(object command)
         {
-                await m_State.Apply(command); 
+            return  await m_State.Apply(command); 
             /*lock (m_SyncRoot)
             {
 
@@ -232,6 +233,7 @@ namespace Inceptum.Raft
                 }
                 m_ResetTimeout.Reset();
             }
+            Console.WriteLine("EXITING timout thread");
         }
 
         internal void ResetTimeout()
@@ -446,13 +448,13 @@ namespace Inceptum.Raft
         {
             if(!m_IsStarted)
                 return;
-                
             m_IsStarted = false;
             Logger.Info("Stopping node {0}", Id);
             foreach (var subscription in m_Subscriptions)
             {
                 subscription.Dispose();
             }
+            m_Subscriptions=new IDisposable[0];
             m_Stop.Set();
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
@@ -464,8 +466,11 @@ namespace Inceptum.Raft
         public Task<object> SendCommandToLeader(object command)
         {
             if (LeaderId == null)
-                throw new InvalidOperationException("Can not process Command unless Leader is selected");
-            return m_Transport.Send(LeaderId,new ApplyCommadRequest{Command = command});
+                return Task<object>.Factory.StartNew(() =>
+                {
+                    throw new InvalidOperationException("Can not process Command unless Leader is selected");
+                });
+            return m_Transport.Send(LeaderId, new ApplyCommadRequest { Command = command });
         }
     }
 }
