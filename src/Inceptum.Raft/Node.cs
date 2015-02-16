@@ -189,15 +189,15 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Start();
         }
 
-        public async Task<object> Apply(object command)
-        {
-            return  await m_State.Apply(command); 
-            /*lock (m_SyncRoot)
+        public Task<object> Apply(object command)
+        {            
+            lock (m_SyncRoot)
             {
-
-            }*/
+               return m_State.Apply(command);
+            }
         }
  
+        
 
         private void timeoutHandlingLoop(object obj)
         {
