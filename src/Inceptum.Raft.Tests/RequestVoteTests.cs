@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 using NUnit.Framework;
 using Rhino.Mocks;
@@ -169,7 +170,7 @@ namespace Inceptum.Raft.Tests
             var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
             VoteResponse response = null;
             var responseSent = new AutoResetEvent(false);
-            Action<string, string, VoteResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
+            Func<string, string, VoteResponse,Task<Object>> send = (from, to, r) => { response = r; responseSent.Set(); return Task.FromResult(default(object)); };
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Anything, Arg<VoteResponse>.Is.Anything)).Do(send).Repeat.Times(voteRequests.Count());
 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using Inceptum.Raft.Rpc;
 using NUnit.Framework;
 using Rhino.Mocks;
@@ -51,7 +52,7 @@ namespace Inceptum.Raft.Tests
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             persistentState.Append(new[] { new LogEntry(1, 1), new LogEntry(1, 2) });
-            var appendEntriesRequest = new AppendEntriesRequest { Entries = new LogEntry[] { new LogEntry(1, 3), new LogEntry(2, 4) }, LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
+            var appendEntriesRequest = new AppendEntriesRequest { Entries = new [] { new LogEntry(1, 3), new LogEntry(2, 4) }, LeaderCommit = -1, LeaderId = "nodeA", PrevLogIndex = 1, PrevLogTerm = 1, Term = 2 };
             var response = createFollowerAndHandleAppendEntriesRequest(persistentState, appendEntriesRequest).Item1;
             Assert.That(response.Success, Is.True, "Successful response was not sent for request");
             Assert.That(persistentState.CurrentTerm, Is.EqualTo(2), "Term was not updated to received from leader");
@@ -112,20 +113,21 @@ namespace Inceptum.Raft.Tests
             var requestSent = new ManualResetEvent(false);
             int cnt=0;
             Node node = null;
-            Action<string, string, AppendEntriesRequest> send = (from, to, r) =>
+            Func<string, string, AppendEntriesRequest, Task<object>> send = (from, to, r) =>
             {
                 requests.Add(r);
                 if (++cnt < 4)
                 {
                     //Return false 3 times (emulating that log is 2 entries beghind the leader's)
                     node.Handle(new AppendEntriesResponse { NodeId = to, Success = false, Term = 1 });
-                    return;
+                    return Task.FromResult(default(object));
                 }
               
                 node.Handle(new AppendEntriesResponse { NodeId = to, Success = true, Term = 1 });
 
                
                 requestSent.Set();
+                return Task.FromResult(default(object));
             };
 
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Once();
@@ -152,7 +154,12 @@ namespace Inceptum.Raft.Tests
             var stateMachine = new StateMachineMock(apply);
             AppendEntriesResponse response = null;
             var responseSent = new ManualResetEvent(false);
-            Action<string, string, AppendEntriesResponse> send = (from, to, r) => { response = r; responseSent.Set(); };
+            Func<string, string, AppendEntriesResponse,Task<object>> send = (from, to, r) =>
+            {
+                response = r;
+                responseSent.Set();
+                return Task.FromResult(default(object));
+            }; 
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
             var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => stateMachine);

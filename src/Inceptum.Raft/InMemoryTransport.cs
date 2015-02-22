@@ -9,13 +9,13 @@ namespace Inceptum.Raft
 {
       public interface IInMemoryBus
     {
-        void Send<T>(string from, string to, T message);
-        IDisposable Subscribe<T>(string subscriberId, Action<T> handler);
+          Task<object> Send<T>(string from, string to, T message);
+          IDisposable Subscribe<T>(string subscriberId, Func<T, Task<object>> handler);
     }
  
     public class InMemoryBus:IInMemoryBus
     {
-        readonly Dictionary<Tuple<string, Type>, Action<object>> m_Subscriptions = new Dictionary<Tuple<string, Type>, Action<object>>();
+        readonly Dictionary<Tuple<string, Type>, Func<object, Task<object>>> m_Subscriptions = new Dictionary<Tuple<string, Type>, Func<object, Task<object>>>();
         readonly List<string> m_FailedNodes = new List<string>();
         public void EmulateConnectivityIssue(string nodeId)
         {
@@ -27,22 +27,23 @@ namespace Inceptum.Raft
         }
 
 
-        public void Send<T>(string from, string to, T message)
+        public Task<object> Send<T>(string from, string to, T message)
         {
             if (m_FailedNodes.Contains(to))
-                return;
+                return Task.FromResult(default(object));
             if (m_FailedNodes.Contains(from))
-                return;
+                return Task.FromResult(default(object));
             var key = Tuple.Create(to, typeof(T));
             lock (m_Subscriptions)
             {
-                Action<object> handler;
+                Func<object, Task<object>> handler;
                 if (m_Subscriptions.TryGetValue(key, out handler))
-                    handler(message);
+                   return handler(message);
             }
+            return Task.FromResult(default(object));
         }
 
-        public IDisposable Subscribe<T>(string subscriberId, Action<T> handler)
+        public IDisposable Subscribe<T>(string subscriberId, Func<T, Task<object>> handler)
         {
             var key = Tuple.Create(subscriberId, typeof(T));
             lock (m_Subscriptions)
@@ -57,17 +58,20 @@ namespace Inceptum.Raft
                 }
             });
         }
+
     }
 
     public class InMemoryTransport : ITransport
     {
         private string m_NodeId;
-        private static IInMemoryBus m_DefaultBus=new InMemoryBus();
-        private static IInMemoryBus m_Bus;
+        private IInMemoryBus m_Bus;
 
-        public InMemoryTransport(string nodeId,IInMemoryBus bus=null)
+
+       
+
+        public InMemoryTransport(string nodeId,IInMemoryBus bus)
         {
-            m_Bus = bus ?? m_DefaultBus;
+            m_Bus = bus;
             m_NodeId = nodeId;
         }
  
@@ -91,14 +95,14 @@ namespace Inceptum.Raft
             m_Bus.Send(m_NodeId, to, message);
         }
 
-        public Task<object> Send(string to, ApplyCommadRequest message)
+        public async Task<object> Send(string to, ApplyCommadRequest message)
         {
-            throw new NotImplementedException();
+            return await m_Bus.Send(m_NodeId, to, message);
         }
 
         public IDisposable Subscribe<T>(Func<T, Task<object>> handler)
         {
-            return m_Bus.Subscribe(m_NodeId,(T t)=>handler(t));
+            return m_Bus.Subscribe(m_NodeId,handler);
         }
     }
 

@@ -35,8 +35,7 @@ namespace Inceptum.Raft.Http
             }
 
             //TODO: exception handling
-            await handler(message);
-            return null;
+            return await handler(message);
         }
 
         public IDisposable RunHost(string baseUrl)
@@ -131,8 +130,7 @@ namespace Inceptum.Raft.Http
                 throw new InvalidOperationException(string.Format("Uri for node {0} is not provided", to));
             }
             var requestUri = string.Format("raft/Command");
-            await send(baseUri, async client => await client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
-            return Task.FromResult<object>(null);
+            return await send(baseUri, async client => await client.PostAsync(requestUri, new ApplyCommandContent(message.Command)));
         }
 
 

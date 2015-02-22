@@ -32,18 +32,18 @@ namespace Inceptum.Raft.Tests
     {
         private readonly List<string> m_KnownNodes = new List<string>(Enumerable.Range(1, 5).Select(i => "node" + i));
 
-
-
+     
       
 
         [Test]
         public void ConsensusIsReachableWithin5ElectionTimeoutsTest()
         {
             const int electionTimeout = 150;
+            var bus = new InMemoryBus();
             var nodes = m_KnownNodes.Select(
                 id => new Node(new InMemoryPersistentState(),
                                     new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                                    new InMemoryTransport(id), () => new StateMachine()))
+                                    new InMemoryTransport(id, bus), () => new StateMachine()))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -66,14 +66,15 @@ namespace Inceptum.Raft.Tests
         [Test]
         public void CommandApplyAwaitsForStateMachineToProcessCommandTest()
         {
-            //TDOD: not sture if it is right logic - SM holds state in memory , so it makes no sence to finish command processing on dispose since SM would be disposed right after it and state would be lost
+            //TODO: not sture if it is right logic - SM holds state in memory , so it makes no sence to finish command processing on dispose since SM would be disposed right after it and state would be lost
             const int electionTimeout = 150;
             var canApply = m_KnownNodes.ToDictionary(k => k, v => new ManualResetEvent(false));
-            var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() =>{canApply[v].WaitOne();}));
+            var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => canApply[v].WaitOne()));
+            var bus = new InMemoryBus();
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) {ElectionTimeout = electionTimeout},
-                        new InMemoryTransport(id), () => stateMachines[id]))
+                        new InMemoryTransport(id, bus), () => stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
 
@@ -82,8 +83,8 @@ namespace Inceptum.Raft.Tests
 
             var exited=new ManualResetEvent(false);
             Task.Factory.StartNew(() => {
-                leader.Apply(10);
-                exited.Set();
+                leader.Apply(10).ContinueWith(task => exited.Set());
+                
             });
             Assert.That(exited.WaitOne(500),Is.False);
             nodes.ForEach(n => canApply[n.Id].Set());
@@ -147,10 +148,11 @@ namespace Inceptum.Raft.Tests
         {
             const int electionTimeout = 150;
             var stateMachines = m_KnownNodes.ToDictionary(k => k, v => new StateMachine(() => {Thread.Sleep(2000); }));
+            var bus = new InMemoryBus();
             var nodes = m_KnownNodes.Select(
                 id =>
                     new Node(new InMemoryPersistentState(), new NodeConfiguration(id, m_KnownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                        new InMemoryTransport(id), () => stateMachines[id]))
+                        new InMemoryTransport(id,bus), () => stateMachines[id]))
                 .ToList();
             nodes.ForEach(n => n.Start());
             Thread.Sleep(electionTimeout * 5);

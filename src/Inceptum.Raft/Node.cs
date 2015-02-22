@@ -25,7 +25,7 @@ namespace Inceptum.Raft
 
     //TODO: restart node on state machine crash (tests/refactoring)
     //TODO: command accepting from clients (tests)
-    //TODO: real world transport (tests)
+    //TODO[DONE]: real world transport (tests)
     //TODO[DONE]: get rid of <TCommand> 
 
 
@@ -129,6 +129,8 @@ namespace Inceptum.Raft
         private void restart()
         {
             stop();
+            PersistentState.Reload();
+            Console.WriteLine("!!!");
             Start();
         }
 
@@ -459,9 +461,7 @@ namespace Inceptum.Raft
             m_TimeoutHandlingThread.Join();
             m_Scheduler.Wait();
             m_StateMachineHost.Dispose();
-            PersistentState.Reload();
-            Console.WriteLine("!!!");
-        }
+         }
 
         public Task<object> SendCommandToLeader(object command)
         {

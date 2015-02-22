@@ -9,6 +9,8 @@ namespace Inceptum.Raft.Rpc
     /// </summary>
     public class AppendEntriesRequest 
     {
+        private IEnumerable<LogEntry> m_Entries;
+
         /// <summary>
         /// Gets or sets the leader’s term.
         /// </summary>
@@ -48,7 +50,11 @@ namespace Inceptum.Raft.Rpc
         /// The entries.
         /// </value>
         [JsonIgnore]
-        public IEnumerable<LogEntry> Entries { get; set; }
+        public IEnumerable<LogEntry> Entries
+        {
+            get { return m_Entries; }
+            set { m_Entries = value??new LogEntry[0]; }
+        }
 
         /// <summary>
         /// Gets or sets the leader’s commit index.
@@ -58,5 +64,9 @@ namespace Inceptum.Raft.Rpc
         /// </value>
         public long LeaderCommit { get; set; }
 
+        public AppendEntriesRequest()
+        {
+            Entries = new LogEntry[0];
+        }
     }
 }
