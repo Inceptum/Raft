@@ -130,7 +130,6 @@ namespace Inceptum.Raft
         {
             stop();
             PersistentState.Reload();
-            Console.WriteLine("!!!");
             Start();
         }
 
