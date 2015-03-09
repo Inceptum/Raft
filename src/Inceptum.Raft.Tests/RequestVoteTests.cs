@@ -89,11 +89,11 @@ namespace Inceptum.Raft.Tests
         public void FollowerSwitchToCandidateTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
+            var nodeConfiguration = new NodeConfiguration("testedNode") {ElectionTimeout = 100000};
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<VoteRequest>.Is.Anything)).Repeat.Once();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -106,9 +106,9 @@ namespace Inceptum.Raft.Tests
         public void CandidateSwitchToLeaderTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
+            var nodeConfiguration = new NodeConfiguration("testedNode") {ElectionTimeout = 100000};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -121,9 +121,9 @@ namespace Inceptum.Raft.Tests
         public void SwitchToFollowerFromCandidateOnAppendEntriesTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100000};
+            var nodeConfiguration = new NodeConfiguration("testedNode") {ElectionTimeout = 100000};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -140,9 +140,9 @@ namespace Inceptum.Raft.Tests
         public void IfElectionTimeoutElapsesCandidateStartsNewElectionTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
+            var nodeConfiguration = new NodeConfiguration("testedNode") {ElectionTimeout = 100};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 node.SwitchToCandidate();
@@ -155,9 +155,9 @@ namespace Inceptum.Raft.Tests
         public void IfElectionTimeoutElapsesFollowerConvertsToCandidateTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") {ElectionTimeout = 100};
+            var nodeConfiguration = new NodeConfiguration("testedNode") {ElectionTimeout = 100};
             var bus = mockTransport();
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 Thread.Sleep(200);
@@ -167,14 +167,14 @@ namespace Inceptum.Raft.Tests
 
         private static IEnumerable<VoteResponse> createFollowerAndHandleVoteRequest(InMemoryPersistentState persistentState,params VoteRequest[] voteRequests)
         {
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
+            var nodeConfiguration = new NodeConfiguration("testedNode") { ElectionTimeout = 100000 };
             VoteResponse response = null;
             var responseSent = new AutoResetEvent(false);
             Func<string, string, VoteResponse,Task<Object>> send = (from, to, r) => { response = r; responseSent.Set(); return Task.FromResult(default(object)); };
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Anything, Arg<VoteResponse>.Is.Anything)).Do(send).Repeat.Times(voteRequests.Count());
 
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new object()))
             {
                 node.Start();
                 foreach (var request in voteRequests)

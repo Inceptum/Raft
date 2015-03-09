@@ -37,7 +37,7 @@ namespace Inceptum.Raft.States
         public override void Enter()
         {
 
-            foreach (var node in Node.Configuration.KnownNodes)
+            foreach (var node in Node.KnownNodes)
             {
                 NextIndexes[node] = Node.PersistentState.Log.Count;
                 MatchIndex[node] = -1;
@@ -73,7 +73,7 @@ namespace Inceptum.Raft.States
 
         private void appendEntries()
         {
-            foreach (var node in Node.Configuration.KnownNodes)
+            foreach (var node in Node.KnownNodes)
             {
                 var nextIndex = NextIndexes[node];
 
@@ -124,7 +124,7 @@ namespace Inceptum.Raft.States
                 //If there exists an N such that N > commitIndex, a majority of matchIndex[i] ≥ N, and log[N].term == currentTerm: set commitIndex = N (§5.3, §5.4)
                 for (var i = Node.CommitIndex+1; i <= MatchIndex.Values.Max(); i++)
                 {
-                    if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Configuration.Majority &&
+                    if (MatchIndex.Values.Count(mi => mi >= Node.CommitIndex) >= Node.Majority &&
                         Node.PersistentState.Log[i].Term == Node.CurrentTerm)
                     {
                         Console.WriteLine(Node.Id + "|" + Node.CurrentTerm + " > APPLY(leader): " + i);

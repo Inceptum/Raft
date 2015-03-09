@@ -67,10 +67,11 @@ namespace Inceptum.Raft
         private IInMemoryBus m_Bus;
 
 
-       
+        public string[] KnownNodes { get; private set; }
 
-        public InMemoryTransport(string nodeId,IInMemoryBus bus)
+        public InMemoryTransport(string nodeId,IInMemoryBus bus, params string[] knownNodes)
         {
+            KnownNodes = knownNodes;
             m_Bus = bus;
             m_NodeId = nodeId;
         }

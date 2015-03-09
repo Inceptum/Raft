@@ -24,6 +24,11 @@ namespace Inceptum.Raft.Http
             m_Endpoints = endpoints;
         }
 
+        public string[] KnownNodes
+        {
+            get { return m_Endpoints.Keys.ToArray(); }
+        }
+
         internal async Task<object> Accept<T>(T message)
         {
             Func<object, Task<object>> handler;
