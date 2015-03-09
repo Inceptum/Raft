@@ -65,7 +65,7 @@ namespace Inceptum.Raft.States
             //Debug.Assert(!m_Votes.ContainsKey(vote.NodeId));
 
             m_Votes[vote.NodeId] = vote;
-            if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Configuration.Majority)
+            if (m_Votes.Values.Count(v => v.VoteGranted) >= Node.Majority)
             {
                 var grantedBy = string.Join(", ",m_Votes.Values.Where(v => v.VoteGranted).Select(r => r.NodeId).ToArray());
                 Node.Logger.Debug("Vote granted by majority of nodes - {0}. Switching state to Leader", grantedBy);

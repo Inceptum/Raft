@@ -44,7 +44,10 @@ namespace Inceptum.Raft
         private string m_LeaderId;
         private readonly Func<object> m_StateMachineFactory;
         private volatile bool m_IsStarted;
+        public string[] KnownNodes { get; private set; }
         internal ILogger Logger { get; private set; }
+        internal int Majority { get; private set; }
+
 
 
         public NodeConfiguration Configuration { get; private set; }
@@ -123,6 +126,11 @@ namespace Inceptum.Raft
             PersistentState = persistentState;
             m_TimeoutBase = Configuration.ElectionTimeout;
             Logger =new LoggerWrapper(this, Configuration.LoggerFactory(GetType()));
+            KnownNodes = m_Transport.KnownNodes.Where(n=>n!=Configuration.NodeId).Distinct().ToArray();
+            if (Configuration.Majority != null)
+                Majority = Math.Max(Configuration.Majority.Value, KnownNodes.Length/2 + 1);
+            else
+                Majority = KnownNodes.Length/2 + 1;
         }
 
 
@@ -297,7 +305,7 @@ namespace Inceptum.Raft
                 LastLogTerm = PersistentState.Log.Select(l => l.Term).LastOrDefault()
             };
 
-            foreach (var node in Configuration.KnownNodes)
+            foreach (var node in KnownNodes)
             {
                 try
                 {
@@ -329,7 +337,7 @@ namespace Inceptum.Raft
 
         internal void Handle(AppendEntriesRequest request)
         {
-            if (!Configuration.KnownNodes.Contains(request.LeaderId))
+            if (!KnownNodes.Contains(request.LeaderId))
             {
                 Logger.Trace("Got AppendEntriesRequest from unknown node {0}. Ignoring...", request.LeaderId);
                 return;
@@ -367,7 +375,7 @@ namespace Inceptum.Raft
         internal void Handle(AppendEntriesResponse response)
         {
 
-            if (!Configuration.KnownNodes.Contains(response.NodeId))
+            if (!KnownNodes.Contains(response.NodeId))
             {
                 Logger.Trace("Got AppendEntriesResponse from unknown node {0}. Ignoring...", response.NodeId);
                 return;
@@ -385,7 +393,7 @@ namespace Inceptum.Raft
 
         internal void Handle(VoteRequest voteRequest)
         {
-            if (!Configuration.KnownNodes.Contains(voteRequest.CandidateId))
+            if (!KnownNodes.Contains(voteRequest.CandidateId))
             {
                 Logger.Trace("Got VoteRequest from unknown node {0}. Ignoring...", voteRequest.CandidateId);
                 return;
@@ -422,7 +430,7 @@ namespace Inceptum.Raft
 
         internal void Handle(VoteResponse vote)
         {
-            if (!Configuration.KnownNodes.Contains(vote.NodeId))
+            if (!KnownNodes.Contains(vote.NodeId))
             {
                 Logger.Trace("Got VoteResponse from unknown node {0}. Ignoring...", vote.NodeId);
                 return;

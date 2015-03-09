@@ -65,7 +65,7 @@ namespace TestConsoleApplication
             var nodes = transports.Select(
                    p => new Node(
                            new InMemoryPersistentState(),
-                           new NodeConfiguration(p.Key, knownNodes.ToArray()) { ElectionTimeout = 300 },
+                           new NodeConfiguration(p.Key) { ElectionTimeout = 300 },
                            p.Value,
                            () =>
                            {
@@ -122,15 +122,15 @@ namespace TestConsoleApplication
             var sb = new StringBuilder();
             try
             {
-                var knownNodes = Enumerable.Range(1, 5).Select(i => "node" + i);
+                var knownNodes = Enumerable.Range(1, 5).Select(i => "node" + i).ToArray();
 
                 var bus = new InMemoryBus();
 
                 var nodes = knownNodes.Select(
                     id =>new Node(
                             new InMemoryPersistentState(), 
-                            new NodeConfiguration(id, knownNodes.ToArray()) { ElectionTimeout = electionTimeout },
-                            new InMemoryTransport(id,bus),
+                            new NodeConfiguration(id) { ElectionTimeout = electionTimeout },
+                            new InMemoryTransport(id,bus, knownNodes),
                             () =>
                             {
                                 string s = id;
@@ -186,7 +186,7 @@ namespace TestConsoleApplication
                 tokenSource2.Cancel();
 
                 {
-                    var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration}).ToArray();
+                    var nodeStates = nodes.Select(node => new {node.Id, node.State, node.LeaderId, node.Configuration,node.KnownNodes}).ToArray();
                     foreach (var node in nodes)
                     {
                         node.Dispose();
@@ -194,7 +194,7 @@ namespace TestConsoleApplication
                     foreach (var node in nodeStates)
                     {
                         sb.AppendLine(string.Format("{0}: {1}\tLeader:{2}", node.Id, node.State, node.LeaderId));
-                        foreach (var knownNode in node.Configuration.KnownNodes)
+                        foreach (var knownNode in node.KnownNodes)
                         {
                             sb.AppendLine(string.Format("\t{0}", knownNode));
                         }

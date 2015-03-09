@@ -86,13 +86,13 @@ namespace Inceptum.Raft.Tests
         public void LeaderHbTest()
         {
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100 };
+            var nodeConfiguration = new NodeConfiguration("testedNode") { ElectionTimeout = 100 };
         
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Twice();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Twice();
 
-            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus), ()=>new Object()))
+            using (var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode",bus, "nodeA", "nodeB"), ()=>new Object()))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -107,7 +107,7 @@ namespace Inceptum.Raft.Tests
             var persistentState = new InMemoryPersistentState { CurrentTerm = 1 };
             persistentState.Append(logEntries);
             //TODO: send AppendEntriesRequest immediately on not success response
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100  };
+            var nodeConfiguration = new NodeConfiguration("testedNode") { ElectionTimeout = 100  };
             var bus = mockTransport();
             var requests = new List<AppendEntriesRequest>();
             var requestSent = new ManualResetEvent(false);
@@ -133,7 +133,7 @@ namespace Inceptum.Raft.Tests
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Once();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeB"), Arg<AppendEntriesRequest>.Is.Anything)).Repeat.Times(4).Do(send);
 
-            using (node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => new StateMachineMock(null)))
+            using (node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => new StateMachineMock(null)))
             {
                 node.Start();
                 node.SwitchToLeader();
@@ -150,7 +150,7 @@ namespace Inceptum.Raft.Tests
         private Tuple<AppendEntriesResponse, Node> createFollowerAndHandleAppendEntriesRequest(InMemoryPersistentState persistentState, AppendEntriesRequest appendEntriesRequest, Action<int> apply=null, bool doNotDisposeNode=false)
         {
              
-            var nodeConfiguration = new NodeConfiguration("testedNode", "nodeA", "nodeB") { ElectionTimeout = 100000 };
+            var nodeConfiguration = new NodeConfiguration("testedNode") { ElectionTimeout = 100000 };
             var stateMachine = new StateMachineMock(apply);
             AppendEntriesResponse response = null;
             var responseSent = new ManualResetEvent(false);
@@ -162,7 +162,7 @@ namespace Inceptum.Raft.Tests
             }; 
             var bus = mockTransport();
             bus.Expect(t => t.Send(Arg<string>.Is.Equal("testedNode"), Arg<string>.Is.Equal("nodeA"), Arg<AppendEntriesResponse>.Is.Anything)).Do(send);
-            var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus), () => stateMachine);
+            var node = new Node(persistentState, nodeConfiguration, new InMemoryTransport("testedNode", bus, "nodeA", "nodeB"), () => stateMachine);
             using (doNotDisposeNode?ActionDisposable.Create(() => { }):node)
             {
                 node.Start();

@@ -6,6 +6,7 @@ namespace Inceptum.Raft
 {
     public interface ITransport
     {
+        string[] KnownNodes { get; }
         void Send(string to, AppendEntriesRequest message);
         void Send(string to, AppendEntriesResponse message);
         void Send(string to, VoteRequest message);

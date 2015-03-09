@@ -25,10 +25,10 @@ namespace Inceptum.Raft
     public class NodeConfiguration
     {
         public int ElectionTimeout { get; set; } 
-        public List<string> KnownNodes { get; set; }
         public string NodeId { get; set; }
 
 
+/*
         public NodeConfiguration(string nodeId, params string[] knownNodes)
         {
             if (string.IsNullOrEmpty(nodeId))
@@ -42,11 +42,21 @@ namespace Inceptum.Raft
             KnownNodes = knownNodes.Where(n=>n!=nodeId).Distinct().ToList();
         }
 
-        public int Majority
+*/
+        public NodeConfiguration(string nodeId)
+        {
+            LoggerFactory = type => new ConsoleLogger(type.Name);
+            NodeId = nodeId;
+        }
+
+
+        public int? Majority { get; set; }
+ 
+ /*       public int? Majority
         {
             get { return KnownNodes == null ? 0 : KnownNodes.Count / 2 + 1; }
         }
-
+ */
         internal Func<Type, ILogger> LoggerFactory { get; set; }
     }
 }
