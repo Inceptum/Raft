@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Http;
 using System.Web.Http.Dispatcher;
@@ -14,6 +15,8 @@ namespace Inceptum.Raft.Http
 {
     public class HttpTransport:ITransport,IDisposable
     {
+        private long m_RequestsInProgress = 0;
+        private bool m_IsDisposed = false;
         readonly Dictionary< Type , Func<object,Task<object>>> m_Subscriptions = new Dictionary<Type, Func<object, Task<object>>>();
         private readonly Dictionary<string, Uri> m_Endpoints;
         private readonly ConcurrentDictionary<Uri, ConcurrentQueue<HttpClient>> m_ClientsCache = new ConcurrentDictionary<Uri, ConcurrentQueue<HttpClient>>();
@@ -136,6 +139,8 @@ namespace Inceptum.Raft.Http
 
         private async Task<HttpResponseMessage> send(Uri baseUri, Func<HttpClient, Task<HttpResponseMessage>> sendRequest)
         {
+            if (m_IsDisposed)
+                throw new ObjectDisposedException("HttpTransport is disposed");
             var queue = m_ClientsCache.GetOrAdd(baseUri, _ => new ConcurrentQueue<HttpClient>());
             HttpClient client;
             if (queue.TryDequeue(out client) == false)
@@ -145,6 +150,7 @@ namespace Inceptum.Raft.Http
                     BaseAddress = baseUri
                 };
             }
+            Interlocked.Increment(ref m_RequestsInProgress);
             try
             {
                 var response = await sendRequest(client);
@@ -163,6 +169,7 @@ namespace Inceptum.Raft.Http
             }
             finally
             {
+                Interlocked.Decrement(ref m_RequestsInProgress);
                 queue.Enqueue(client);
             }
         }
@@ -170,6 +177,11 @@ namespace Inceptum.Raft.Http
 
         public void Dispose()
         {
+            m_IsDisposed = true;
+            while (Interlocked.Read(ref m_RequestsInProgress) > 0)
+            {
+                Thread.Sleep(100);
+            }
             foreach (var q in m_ClientsCache.Select(x => x.Value))
             {
                 HttpClient result;
