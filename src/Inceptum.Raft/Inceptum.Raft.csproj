@@ -76,6 +76,8 @@
     <Compile Include="Logging\ILogger.cs" />
     <Compile Include="Logging\LoggerWrapper.cs" />
     <Compile Include="Rpc\ApplyCommadRequest.cs" />
+    <Compile Include="Rpc\InstallSnapshotRequest.cs" />
+    <Compile Include="Rpc\InstallSnapshotResponse.cs" />
     <Compile Include="SingleThreadTaskScheduler.cs" />
     <Compile Include="InMemoryTransport.cs" />
     <Compile Include="ITransport.cs" />
